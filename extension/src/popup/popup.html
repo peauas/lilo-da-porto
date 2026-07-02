@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lilo da Porto</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="logo">⚓</div>
+      <div>
+        <h1>Lilo da Porto</h1>
+        <p>Captura de serviços</p>
+      </div>
+    </header>
+
+    <section id="login-section" class="section hidden">
+      <label>E-mail</label>
+      <input type="email" id="email" placeholder="admin@lilodaporto.com" />
+      <label>Senha</label>
+      <input type="password" id="password" placeholder="••••••••" />
+      <label>URL da API</label>
+      <input type="url" id="api-url" placeholder="https://seu-app.vercel.app" />
+      <button id="login-btn" class="btn primary">Entrar</button>
+      <p id="login-error" class="error hidden"></p>
+    </section>
+
+    <section id="main-section" class="section hidden">
+      <div class="field">
+        <label>Funcionário *</label>
+        <select id="employee"></select>
+      </div>
+
+      <div id="fields" class="fields"></div>
+
+      <div class="actions">
+        <button id="capture-btn" class="btn secondary">Capturar da página</button>
+        <button id="submit-btn" class="btn primary">Enviar serviço</button>
+      </div>
+      <p id="status" class="status"></p>
+    </section>
+
+    <section id="loading" class="section">
+      <p>Carregando...</p>
+    </section>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

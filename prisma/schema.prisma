@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ServiceOrigin {
+  MANUAL
+  EXTENSION
+}
+
+enum DocumentCategory {
+  RG
+  CPF
+  CNH
+  RESIDENCE_PROOF
+  CONTRACT
+  SIGNED_SHEET
+  OTHER
+}
+
+enum SheetStatus {
+  DRAFT
+  CLOSED
+  REOPENED
+}
+
+model User {
+  id            String               @id @default(cuid())
+  email         String               @unique
+  name          String
+  passwordHash  String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  resetTokens   PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Employee {
+  id                 String             @id @default(cuid())
+  name               String
+  phone              String?
+  cpf                String             @unique
+  rg                 String?
+  cnh                String?
+  birthDate          DateTime?
+  address            Json?
+  pix                String?
+  bank               String?
+  agency             String?
+  account            String?
+  defaultPercentage  Decimal            @default(70) @db.Decimal(5, 2)
+  status             EmployeeStatus     @default(ACTIVE)
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  documents          EmployeeDocument[]
+  services           Service[]
+  monthlySheets      MonthlySheet[]
+
+  @@index([status])
+  @@index([name])
+}
+
+model EmployeeDocument {
+  id           String           @id @default(cuid())
+  employeeId   String
+  name         String
+  category     DocumentCategory
+  blobUrl      String
+  blobPathname String
+  mimeType     String
+  sizeBytes    Int
+  notes        String?
+  uploadedAt   DateTime         @default(now())
+  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, category])
+}
+
+model Service {
+  id              String        @id @default(cuid())
+  serviceNumber   String
+  qru             String
+  employeeId      String
+  serviceDate     DateTime      @db.Date
+  baseValue       Decimal       @db.Decimal(12, 2)
+  additionalValue Decimal       @default(0) @db.Decimal(12, 2)
+  totalValue      Decimal       @db.Decimal(12, 2)
+  notes           String?
+  origin          ServiceOrigin @default(MANUAL)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, qru])
+  @@index([serviceDate, employeeId])
+  @@index([employeeId])
+}
+
+model MonthlySheet {
+  id               String                @id @default(cuid())
+  employeeId       String
+  year             Int
+  month            Int
+  percentage       Decimal               @db.Decimal(5, 2)
+  costAllowance    Decimal               @default(0) @db.Decimal(12, 2)
+  voucher          Decimal               @default(0) @db.Decimal(12, 2)
+  inss             Decimal               @default(0) @db.Decimal(12, 2)
+  coparticipation  Decimal               @default(0) @db.Decimal(12, 2)
+  otherDiscounts   Decimal               @default(0) @db.Decimal(12, 2)
+  grossTotal       Decimal               @default(0) @db.Decimal(12, 2)
+  netTotal         Decimal               @default(0) @db.Decimal(12, 2)
+  status           SheetStatus           @default(DRAFT)
+  notes            String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  employee         Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  history          MonthlySheetHistory[]
+
+  @@unique([employeeId, year, month])
+  @@index([year, month])
+}
+
+model MonthlySheetHistory {
+  id        String       @id @default(cuid())
+  sheetId   String
+  action    String
+  details   Json?
+  createdAt DateTime     @default(now())
+  sheet     MonthlySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId])
+}
