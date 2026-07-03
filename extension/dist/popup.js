@@ -1,12 +1,151 @@
 const FIELD_LABELS = {
   serviceNumber: "Nº Serviço",
   qru: "QRU",
+  employeeName: "Nome do funcionário",
+  employeeCpf: "CPF do funcionário",
   baseValue: "Valor base",
   additionalValue: "Adicional",
   totalValue: "Total",
   serviceDate: "Data",
-  notes: "Observação",
 };
+
+function formatCurrency(value) {
+  const number = typeof value === "string" ? Number(value) : value;
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(number || 0);
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("pt-BR").format(date);
+}
+
+function formatFieldValue(key, value) {
+  if (key === "baseValue" || key === "additionalValue" || key === "totalValue") {
+    return formatCurrency(value);
+  }
+  if (key === "serviceDate") {
+    return formatDate(value);
+  }
+  return value;
+}
+
+function normalizeCpf(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function findExactEmployeeMatch(list, name, cpf) {
+  const normalizedCpf = normalizeCpf(cpf);
+  const normalizedName = String(name || "").trim().toLowerCase();
+  return (
+    list.find((emp) => normalizeCpf(emp.cpf) === normalizedCpf) ||
+    list.find((emp) => emp.name?.trim().toLowerCase() === normalizedName) ||
+    list.find((emp) => emp.name?.trim().toLowerCase().includes(normalizedName))
+  );
+}
+
+async function searchEmployees(search) {
+  if (!search || !apiUrl || !token) return [];
+  try {
+    const res = await fetch(
+      `${apiUrl}/api/employees?search=${encodeURIComponent(search)}&status=ACTIVE&limit=20`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    const json = await res.json();
+    return json.success && Array.isArray(json.data) ? json.data : [];
+  } catch {
+    return [];
+  }
+}
+
+async function getOrCreateEmployee(extracted) {
+  const name = String(extracted.employeeName?.value || "").trim();
+  const cpf = normalizeCpf(extracted.employeeCpf?.value);
+  if (!name) return null;
+
+  let employeesFound = cpf.length >= 11 ? await searchEmployees(cpf) : [];
+  let employee = findExactEmployeeMatch(employeesFound, name, cpf);
+
+  if (!employee) {
+    employeesFound = await searchEmployees(name);
+    employee = findExactEmployeeMatch(employeesFound, name, cpf);
+  }
+
+  if (employee) return employee;
+  if (cpf.length < 11) return null;
+
+  try {
+    const res = await fetch(`${apiUrl}/api/employees`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name,
+        cpf,
+        defaultPercentage: 100,
+        status: "ACTIVE",
+      }),
+    });
+    const json = await res.json();
+    if (res.ok && json.success) return json.data;
+    if (res.status === 409) {
+      const retry = await searchEmployees(cpf);
+      return findExactEmployeeMatch(retry, name, cpf);
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function captureFromPage() {
+  setStatus("Capturando dados...", "");
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "GET_TAB_DATA" }, async (response) => {
+      if (chrome.runtime.lastError) {
+        setStatus(`${chrome.runtime.lastError.message || "Erro na captura"}`, "error");
+        return resolve(false);
+      }
+      if (!response?.success) {
+        const detail = response?.details ? `: ${response.details}` : "";
+        setStatus(response?.error ? `${response.error}${detail}` : `Erro na captura${detail}`, "error");
+        return resolve(false);
+      }
+      extractedData = response.data;
+      renderFields(extractedData);
+      setStatus("Dados capturados. Revise antes de enviar.", "success");
+      await autoSelectEmployee();
+      resolve(true);
+    });
+  });
+}
+
+async function autoSelectEmployee() {
+  if (!extractedData) return;
+  const employee = await getOrCreateEmployee(extractedData);
+  if (!employee) return;
+  if (!employees.some((e) => e.id === employee.id)) {
+    employees.unshift(employee);
+  }
+  const select = document.getElementById("employee");
+  select.innerHTML = '<option value="">Selecione...</option>';
+  employees.forEach((e) => {
+    const opt = document.createElement("option");
+    opt.value = e.id;
+    opt.textContent = e.name;
+    select.appendChild(opt);
+  });
+  select.value = employee.id;
+  setStatus(`Funcionário automaticamente selecionado: ${employee.name}`, "success");
+}
 
 let token = null;
 let apiUrl = null;
@@ -95,30 +234,19 @@ function renderFields(data) {
     return;
   }
   for (const [key, field] of Object.entries(data)) {
-    if (key === "notes" && !field.value) continue;
+    if (key === "qru") continue;
+    if (!field?.value && key !== "baseValue" && key !== "additionalValue" && key !== "totalValue") continue;
     const row = document.createElement("div");
     row.className = "field-row";
     const label = FIELD_LABELS[key] || key;
     const lowConf = field.confidence < 0.6;
+    const formattedValue = formatFieldValue(key, field.value);
     row.innerHTML = `
       <span>${label}</span>
-      <span class="${lowConf ? "low-confidence" : ""}">${field.value}${lowConf ? " ⚠" : ""}</span>
+      <span class="${lowConf ? "low-confidence" : ""}">${formattedValue}${lowConf ? " ⚠" : ""}</span>
     `;
     container.appendChild(row);
   }
-}
-
-async function captureFromPage() {
-  setStatus("Capturando dados...", "");
-  chrome.runtime.sendMessage({ type: "GET_TAB_DATA" }, (response) => {
-    if (!response?.success) {
-      setStatus(response?.error || "Erro na captura", "error");
-      return;
-    }
-    extractedData = response.data;
-    renderFields(extractedData);
-    setStatus("Dados capturados. Revise antes de enviar.", "success");
-  });
 }
 
 document.getElementById("capture-btn").addEventListener("click", captureFromPage);
@@ -129,19 +257,17 @@ document.getElementById("submit-btn").addEventListener("click", async () => {
     setStatus("Selecione um funcionário", "error");
     return;
   }
-  if (!extractedData?.qru?.value) {
+  if (!extractedData?.serviceNumber?.value) {
     setStatus("Capture os dados da página primeiro", "error");
     return;
   }
 
   const payload = {
     employeeId,
-    serviceNumber: String(extractedData.serviceNumber.value),
-    qru: String(extractedData.qru.value).trim(),
+    serviceNumber: String(extractedData.serviceNumber.value).trim(),
     serviceDate: extractedData.serviceDate.value,
     baseValue: Number(extractedData.baseValue.value) || 0,
     additionalValue: Number(extractedData.additionalValue.value) || 0,
-    notes: extractedData.notes?.value || undefined,
     origin: "EXTENSION",
   };
 
@@ -177,7 +303,7 @@ document.getElementById("submit-btn").addEventListener("click", async () => {
 
 function showDuplicateDialog(payload) {
   const confirmed = confirm(
-    `QRU ${duplicateService.qru} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`
+    `Serviço ${duplicateService.serviceNumber} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`
   );
   if (confirmed && duplicateService) {
     updateExisting(payload);

@@ -2,12 +2,16 @@
   "manifest_version": 3,
   "name": "Lilo da Porto",
   "description": "Captura serviços do portal Porto Seguro para o sistema Lilo da Porto",
-  "version": "1.0.0",
-  "permissions": ["activeTab", "storage"],
+  "version": "1.1.0",
+  "permissions": ["activeTab", "tabs", "storage", "scripting"],
   "host_permissions": [
     "https://*.portoseguro.com.br/*",
     "https://*.porto/*",
+    "https://*.my.site.com/*",
+    "https://portosocorro.my.site.com/*",
     "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://lilo-da-porto.vercel.app/*",
     "https://*.vercel.app/*"
   ],
   "action": {
@@ -26,10 +30,12 @@
     {
       "matches": [
         "https://*.portoseguro.com.br/*",
-        "https://*.porto/*"
+        "https://*.porto/*",
+        "https://*.my.site.com/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "icons": {

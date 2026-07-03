@@ -30,6 +30,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# local editor state
+.cursor/
+
+# uploads
+public/uploads/
+
 # env files (can opt-in for committing if needed)
 .env*
 
