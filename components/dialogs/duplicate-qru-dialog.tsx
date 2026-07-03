@@ -40,14 +40,14 @@ export function DuplicateQRUDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>QRU duplicado</DialogTitle>
+          <DialogTitle>Serviço duplicado</DialogTitle>
           <DialogDescription>
-            Já existe um serviço com este QRU para o funcionário selecionado.
+            Já existe um serviço com este número para o funcionário selecionado.
           </DialogDescription>
         </DialogHeader>
         <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-1">
-          <p><strong>QRU:</strong> {existingService.qru}</p>
           <p><strong>Serviço:</strong> {existingService.serviceNumber}</p>
+          {existingService.qru && <p><strong>QRU:</strong> {existingService.qru}</p>}
           <p><strong>Data:</strong> {formatDate(existingService.serviceDate)}</p>
           <p><strong>Valor:</strong> {formatCurrency(Number(existingService.totalValue))}</p>
         </div>

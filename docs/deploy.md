@@ -22,7 +22,7 @@ gh repo create lilo-da-porto --public --source=. --remote=origin --push
 | `DATABASE_URL` | URL pooler do Neon |
 | `DIRECT_URL` | URL direta do Neon (sem `-pooler`) |
 | `AUTH_SECRET` | Mesmo valor do `.env` local |
-| `AUTH_URL` | `https://seu-dominio.vercel.app` |
+| `AUTH_URL` | `https://seu-projeto.vercel.app` (não use localhost!) ou remova — auto-detecta na Vercel |
 | `BLOB_READ_WRITE_TOKEN` | Token do Vercel Blob (Storage) |
 | `ADMIN_EMAIL` | E-mail do admin |
 | `ADMIN_PASSWORD` | Senha inicial (só para seed) |
@@ -47,5 +47,5 @@ npm run db:seed
 ### 5. Extensão Chrome
 
 Após deploy, configure no popup da extensão:
-- **URL da API:** `https://seu-dominio.vercel.app`
+- **URL da API:** `https://lilo-da-porto.vercel.app` (já vem como padrão na extensão)
 - Faça login com as credenciais do admin

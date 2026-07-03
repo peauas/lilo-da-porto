@@ -174,7 +174,6 @@ export default function SheetDetailPage({
                 <TableRow>
                   <TableHead>Data</TableHead>
                   <TableHead>Serviço</TableHead>
-                  <TableHead>QRU</TableHead>
                   <TableHead>Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -183,13 +182,11 @@ export default function SheetDetailPage({
                   id: string;
                   serviceDate: string;
                   serviceNumber: string;
-                  qru: string;
                   totalValue: string;
                 }) => (
                   <TableRow key={s.id}>
                     <TableCell>{formatDate(s.serviceDate)}</TableCell>
                     <TableCell>{s.serviceNumber}</TableCell>
-                    <TableCell>{s.qru}</TableCell>
                     <TableCell>{formatCurrency(Number(s.totalValue))}</TableCell>
                   </TableRow>
                 ))}

@@ -3,7 +3,7 @@ import { apiError, apiSuccess } from "@/lib/api-response";
 import { requireApiAuth, checkRateLimit } from "@/lib/auth-helpers";
 import { serviceQuerySchema, serviceSchema } from "@/schemas/service.schema";
 import {
-  checkDuplicateQru,
+  checkDuplicateServiceNumber,
   createService,
   getServicesGroupedByYearMonth,
   listServices,
@@ -42,12 +42,12 @@ export async function POST(request: NextRequest) {
       return apiError("VALIDATION_ERROR", "Dados inválidos", 400, parsed.error.flatten());
     }
 
-    const duplicate = await checkDuplicateQru(
+    const duplicate = await checkDuplicateServiceNumber(
       parsed.data.employeeId,
-      parsed.data.qru.trim(),
+      parsed.data.serviceNumber.trim(),
     );
     if (duplicate) {
-      return apiError("DUPLICATE_QRU", "QRU já existe para este funcionário", 409, duplicate);
+      return apiError("DUPLICATE_SERVICE", "Número de serviço já existe para este funcionário", 409, duplicate);
     }
 
     const service = await createService(parsed.data);

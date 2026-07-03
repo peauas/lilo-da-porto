@@ -1,9 +1,12 @@
+import { ensureAuthUrl } from "@/lib/app-url";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@/schemas/auth.schema";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
+
+ensureAuthUrl();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,

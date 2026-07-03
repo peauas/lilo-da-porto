@@ -6,7 +6,6 @@ import {
   Users,
   Wrench,
   DollarSign,
-  Hash,
   Clock,
   FileWarning,
 } from "lucide-react";
@@ -72,9 +71,9 @@ export default function DashboardPage() {
           icon={DollarSign}
         />
         <StatCard
-          title="QRUs únicos"
-          value={data?.uniqueQrus ?? 0}
-          icon={Hash}
+          title="Serviços únicos"
+          value={data?.uniqueServiceNumbers ?? 0}
+          icon={Clock}
           description={`Líquido est.: ${formatCurrency(data?.estimatedNet ?? 0)}`}
         />
       </div>
@@ -92,7 +91,6 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {data.recentServices.map((s: {
                   id: string;
-                  qru: string;
                   serviceNumber: string;
                   totalValue: string;
                   serviceDate: string;
@@ -102,7 +100,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="font-medium">{s.employee.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        QRU {s.qru} · {formatDate(s.serviceDate)}
+                        Serviço {s.serviceNumber} · {formatDate(s.serviceDate)}
                       </p>
                     </div>
                     <p className="font-semibold">{formatCurrency(Number(s.totalValue))}</p>

@@ -20,10 +20,15 @@ Para cada campo (QRU, serviço, valores, data), o pipeline tenta em ordem:
 
 | Campo | Keywords | Regex |
 |-------|----------|-------|
-| QRU | qru, código qru | `QRU[A-Z0-9]{4,20}` |
-| Serviço | nº serviço, os | `\d{5,12}` |
-| Valores | valor base, adicional, total | `R$ [\d.,]+` |
-| Data | data, dt. | `\d{2}/\d{2}/\d{4}` |
+| QRU / QRA | qra, qru | Código numérico (ex: 119431) |
+| Serviço | ordem de serviço | `01/4339106-26` |
+| Valor | custos da ordem de serviço | `R$ 181,00` |
+| Data | data de abertura | `30/06/2026` |
+
+## Portal suportado
+
+- `https://portosocorro.my.site.com/prestador/s/workorder/...` (Salesforce)
+- Domínios `*.portoseguro.com.br` e `*.porto/*`
 
 ## Fluxo
 

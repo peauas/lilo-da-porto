@@ -53,6 +53,21 @@ export async function getService(id: string) {
   });
 }
 
+export async function checkDuplicateServiceNumber(
+  employeeId: string,
+  serviceNumber: string,
+  excludeId?: string,
+) {
+  return prisma.service.findFirst({
+    where: {
+      employeeId,
+      serviceNumber,
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+    },
+    include: { employee: { select: { name: true } } },
+  });
+}
+
 export async function checkDuplicateQru(
   employeeId: string,
   qru: string,
@@ -73,7 +88,7 @@ export async function createService(data: ServiceInput) {
   const service = await prisma.service.create({
     data: {
       serviceNumber: data.serviceNumber,
-      qru: data.qru.trim(),
+      qru: data.qru ? data.qru.trim() : null,
       employeeId: data.employeeId,
       serviceDate: new Date(data.serviceDate),
       baseValue: data.baseValue,
@@ -100,7 +115,7 @@ export async function updateService(id: string, data: ServiceUpdateInput) {
     data: {
       ...data,
       ...(data.serviceDate ? { serviceDate: new Date(data.serviceDate) } : {}),
-      ...(data.qru ? { qru: data.qru.trim() } : {}),
+      ...(data.qru !== undefined ? { qru: data.qru ? data.qru.trim() : null } : {}),
       totalValue,
     },
     include: { employee: { select: { name: true } } },

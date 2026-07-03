@@ -1,8 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { Moon, Sun, LogOut, Menu } from "lucide-react";
-import { useTheme } from "next-themes";
+import { LogOut, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,7 +30,6 @@ const mobileNav = [
 ];
 
 export function Header({ userName }: { userName?: string | null }) {
-  const { theme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -46,20 +44,8 @@ export function Header({ userName }: { userName?: string | null }) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <p className="text-sm text-muted-foreground hidden sm:block">
-            Olá, <span className="font-medium text-foreground">{userName ?? "Admin"}</span>
-          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Alternar tema</span>
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">

@@ -80,7 +80,7 @@ export function ServiceForm({
           <Input id="serviceNumber" {...register("serviceNumber")} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="qru">QRU *</Label>
+          <Label htmlFor="qru">QRU</Label>
           <Input id="qru" {...register("qru")} />
         </div>
         <div className="space-y-2">

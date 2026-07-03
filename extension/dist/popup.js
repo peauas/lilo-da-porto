@@ -68,15 +68,17 @@ async function getOrCreateEmployee(extracted) {
   const cpf = normalizeCpf(extracted.employeeCpf?.value);
   if (!name) return null;
 
-  let employeesFound = cpf.length >= 11 ? await searchEmployees(cpf) : [];
-  let employee = findExactEmployeeMatch(employeesFound, name, cpf);
-
-  if (!employee) {
-    employeesFound = await searchEmployees(name);
-    employee = findExactEmployeeMatch(employeesFound, name, cpf);
+  let employee = null;
+  if (cpf.length === 11) {
+    const byCpf = await searchEmployees(cpf);
+    employee = findExactEmployeeMatch(byCpf, name, cpf);
+    if (employee) return employee;
   }
 
+  const byName = await searchEmployees(name);
+  employee = findExactEmployeeMatch(byName, name, cpf);
   if (employee) return employee;
+
   if (cpf.length < 11) return null;
 
   try {

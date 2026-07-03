@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const serviceSchema = z.object({
   serviceNumber: z.string().min(1, "Número do serviço é obrigatório"),
-  qru: z.string().min(1, "QRU é obrigatório"),
+  qru: z.string().optional().or(z.literal("")),
   employeeId: z.string().min(1, "Funcionário é obrigatório"),
   serviceDate: z.string().min(1, "Data é obrigatória"),
   baseValue: z.coerce.number().min(0),
@@ -22,9 +22,9 @@ export const serviceQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(50),
 });
 
-export const checkQruSchema = z.object({
+export const checkServiceNumberSchema = z.object({
   employeeId: z.string().min(1),
-  qru: z.string().min(1),
+  serviceNumber: z.string().min(1),
   excludeId: z.string().optional(),
 });
 

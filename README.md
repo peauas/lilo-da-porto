@@ -71,7 +71,7 @@ npm run extension:build
 1. Abra `chrome://extensions`
 2. Ative "Modo do desenvolvedor"
 3. "Carregar sem compactação" → selecione `extension/dist`
-4. Configure a URL da API no popup da extensão
+4. A URL da API já vem como `https://lilo-da-porto.vercel.app` (use `http://localhost:3000` só em desenvolvimento)
 5. Faça login e abra um serviço no portal Porto Seguro
 6. Clique na extensão → Capturar → Revise → Enviar
 

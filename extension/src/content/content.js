@@ -13,12 +13,13 @@ const FIELD_KEYWORDS = {
     "workorder",
   ],
   name: [
-    "nome",
-    "nome do cliente",
-    "nome do segurado",
-    "nome do titular",
-    "nome do beneficiário",
-    "nome do beneficiario",
+    "nome do funcionário",
+    "nome do funcionario",
+    "nome do colaborador",
+    "nome do motorista",
+    "nome do prestador",
+    "nome do técnico",
+    "nome do tecnico",
   ],
   cpf: ["cpf", "c.p.f", "cadastro", "documento"],
   baseValue: ["valor base", "valor serviço", "valor do serviço", "custos da ordem"],
@@ -132,11 +133,47 @@ function parseCpf(value) {
   return bare ? bare[1] : null;
 }
 
+function parseQraName(value) {
+  if (!value) return "";
+  const parts = value.split(/[-–—]/);
+  if (parts.length > 1) {
+    const namePart = parts.slice(1).join("-").trim();
+    if (namePart) return namePart;
+  }
+  const qraMatch = value.match(/^\d{4,12}\s+(.+)$/);
+  if (qraMatch) return qraMatch[1].trim();
+  return "";
+}
+
 function extractEmployeeName(text) {
-  const labelVal = findByLabel(FIELD_KEYWORDS.name);
-  if (labelVal) return { value: labelVal.trim(), confidence: 0.95 };
-  const line = findByMultilineLabel(text, FIELD_KEYWORDS.name);
-  if (line) return { value: line.trim(), confidence: 0.8 };
+  const qraLine = findByLabel(FIELD_KEYWORDS.qru);
+  const qraName = parseQraName(qraLine);
+  if (qraName) return { value: qraName, confidence: 0.95 };
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/\bQRA\b/i.test(line) || /\bQRU\b/i.test(line)) {
+      const nextLine = lines[i + 1] ?? "";
+      const currentName = parseQraName(line);
+      if (currentName) return { value: currentName, confidence: 0.95 };
+      if (/^\d{4,12}\s*[-–—]/.test(nextLine)) {
+        const nextName = parseQraName(nextLine);
+        if (nextName) return { value: nextName, confidence: 0.95 };
+      }
+    }
+  }
+
+  const qraTextMatch = text.match(/\bQRA\b[\s\S]{0,200}?\d{4,12}\s*[-–—]\s*([^\n\r]+)/i);
+  if (qraTextMatch) {
+    const namePart = qraTextMatch[1].trim();
+    if (namePart) return { value: namePart, confidence: 0.95 };
+  }
+
   return { value: "", confidence: 0 };
 }
 

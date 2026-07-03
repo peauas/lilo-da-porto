@@ -18,7 +18,7 @@ export async function getDashboardStats() {
     getActiveEmployeesCount(),
     prisma.service.findMany({
       where: { serviceDate: { gte: start, lte: end } },
-      select: { totalValue: true, qru: true },
+      select: { totalValue: true, serviceNumber: true },
     }),
     prisma.service.findMany({
       orderBy: { createdAt: "desc" },
@@ -29,7 +29,7 @@ export async function getDashboardStats() {
   ]);
 
   const grossTotal = monthServices.reduce((acc, s) => acc + Number(s.totalValue), 0);
-  const uniqueQrus = new Set(monthServices.map((s) => s.qru)).size;
+  const uniqueServiceNumbers = new Set(monthServices.map((s) => s.serviceNumber)).size;
 
   const employees = await prisma.employee.findMany({
     where: { status: "ACTIVE" },
@@ -46,7 +46,7 @@ export async function getDashboardStats() {
     totalServices: monthServices.length,
     grossTotal,
     estimatedNet,
-    uniqueQrus,
+    uniqueServiceNumbers,
     recentServices,
     pendingSheets,
   };

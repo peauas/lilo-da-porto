@@ -8,7 +8,6 @@ import {
   Wrench,
   FileSpreadsheet,
   Settings,
-  Anchor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,15 +23,9 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden lg:flex w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center gap-3 border-b border-white/10 px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <Anchor className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <div>
-          <p className="font-semibold leading-tight">Lilo da Porto</p>
-          <p className="text-xs text-sidebar-foreground/70">Gestão de folhas</p>
-        </div>
+    <aside className="hidden lg:flex fixed left-0 top-0 h-screen w-64 flex-col bg-[#00445C] text-white">
+      <div className="flex h-28 items-center justify-center border-b border-[#003f52] px-6">
+        <img src="/logo.svg" alt="Logo" className="w-full max-w-[240px] object-contain" />
       </div>
       <nav className="flex-1 space-y-1 p-4">
         {navItems.map((item) => {
@@ -48,8 +41,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-sidebar-accent text-white"
-                  : "text-sidebar-foreground/80 hover:bg-white/10 hover:text-white",
+                  ? "rounded-2xl bg-white/15 text-white"
+                  : "text-white/85 hover:bg-white/10 hover:text-white",
               )}
             >
               <Icon className="h-4 w-4" />

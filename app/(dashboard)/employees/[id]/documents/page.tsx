@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Trash2, Download, Eye } from "lucide-react";
-import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,14 +121,31 @@ export default function EmployeeDocumentsPage({
         </Link>
       </Button>
 
-      <PageHeader title="Documentos" description="Upload e gestão de documentos do funcionário" />
+      <div className="rounded-[32px] border border-border bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Documentos</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Documentos do funcionário</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Veja, edite ou baixe arquivos anexados ao funcionário.</p>
+          </div>
+          <Button variant="secondary" size="sm" asChild>
+            <Link href={`/employees/${id}`}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar ao perfil
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-      <form onSubmit={handleUpload} className="rounded-xl border border-border bg-card p-6 space-y-4">
-        <h3 className="font-semibold flex items-center gap-2">
-          <Upload className="h-4 w-4" />
-          Enviar documento
-        </h3>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="rounded-[32px] border border-border bg-card p-6 shadow-sm space-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Upload de documento</p>
+            <p className="text-sm text-muted-foreground">Envie novo arquivo e mantenha tudo organizado.</p>
+          </div>
+          <div className="rounded-3xl bg-muted px-4 py-2 text-sm text-muted-foreground">Apenas PDF, JPG, PNG e WEBP</div>
+        </div>
+        <form onSubmit={handleUpload} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Arquivo (PDF, JPG, PNG — máx. 10 MB)</Label>
             <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
@@ -153,16 +169,16 @@ export default function EmployeeDocumentsPage({
             <Label>Observação</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-        </div>
         <Button type="submit" disabled={uploading}>
           {uploading ? "Enviando..." : "Enviar documento"}
         </Button>
       </form>
+      </div>
 
       {isLoading ? (
         <Skeleton className="h-48" />
       ) : documents?.length ? (
-        <div className="rounded-xl border border-border bg-card">
+        <div className="overflow-hidden rounded-[28px] border border-border bg-white shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>

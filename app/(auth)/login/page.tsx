@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Anchor, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { loginSchema, type LoginInput } from "@/schemas/auth.schema";
 import { Button } from "@/components/ui/button";
@@ -53,12 +53,11 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#001b4d] via-[#003087] to-[#0066cc] p-4">
-      <Card className="w-full max-w-md shadow-2xl animate-fade-in">
+      <Card className="w-full max-w-md animate-fade-in">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary">
-            <Anchor className="h-7 w-7 text-primary-foreground" />
+          <div className="mx-auto mb-4 flex h-24 w-full max-w-[280px] items-center justify-center rounded-[28px] bg-muted/80 p-4">
+            <img src="/logo.svg" alt="Logo" className="h-16 w-auto object-contain" />
           </div>
-          <CardTitle className="text-2xl">Lilo da Porto</CardTitle>
           <CardDescription>
             Entre para gerenciar folhas e serviços
           </CardDescription>

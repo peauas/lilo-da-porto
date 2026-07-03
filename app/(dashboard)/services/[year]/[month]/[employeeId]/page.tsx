@@ -95,13 +95,12 @@ export default function EmployeeServicesPage({
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : services?.length ? (
-        <div className="rounded-xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
                 <TableHead>Serviço</TableHead>
-                <TableHead>QRU</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -119,7 +118,6 @@ export default function EmployeeServicesPage({
                 <TableRow key={s.id}>
                   <TableCell>{formatDate(s.serviceDate)}</TableCell>
                   <TableCell>{s.serviceNumber}</TableCell>
-                  <TableCell>{s.qru}</TableCell>
                   <TableCell>{formatCurrency(Number(s.totalValue))}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">
