@@ -33,6 +33,14 @@ const FIELD_KEYWORDS = {
     "data de acionamento",
     "data",
   ],
+  startDate: [
+    "data início",
+    "data inicio",
+    "data de início",
+    "data de inicio",
+    "início do serviço",
+    "inicio do servico",
+  ],
   notes: ["motivo", "observação", "observacao", "obs", "descrição"],
 };
 
@@ -40,14 +48,26 @@ function getVisibleText() {
   return (document.body?.innerText ?? "").replace(/\r/g, "");
 }
 
+/** Remove acentos para comparação tolerante (ex: "início" === "inicio") */
+function stripAccents(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 /** Label na linha N, valor na linha N+1 (padrão Salesforce Lightning) */
 function findByMultilineLabel(text, keywords) {
+  const normKeywords = keywords.map((k) => stripAccents(k.toLowerCase()));
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   for (let i = 0; i < lines.length - 1; i++) {
-    const line = lines[i].toLowerCase();
-    if (keywords.some((k) => line === k || line.startsWith(k + " ") || line.includes(k))) {
+    const line = stripAccents(lines[i].toLowerCase());
+    if (normKeywords.some((k) => line === k || line.startsWith(k + " ") || line.includes(k))) {
       const next = lines[i + 1];
-      if (next && next.length < 300 && !keywords.some((k) => next.toLowerCase().includes(k))) {
+      if (
+        next &&
+        next.length < 300 &&
+        !normKeywords.some((k) => stripAccents(next.toLowerCase()).includes(k))
+      ) {
         return next;
       }
     }
@@ -57,14 +77,15 @@ function findByMultilineLabel(text, keywords) {
 
 /** Busca em pares label/valor no DOM (Salesforce slds) */
 function findBySalesforceForm(keywords) {
+  const normKeywords = keywords.map((k) => stripAccents(k.toLowerCase()));
   const labels = document.querySelectorAll(
     ".slds-form-element__label, records-record-layout-item [slot='label'], " +
       "span.test-id__field-label, dt, th, label, .forceOutputLabel",
   );
 
   for (const labelEl of labels) {
-    const labelText = (labelEl.textContent ?? "").toLowerCase().trim();
-    if (!keywords.some((k) => labelText.includes(k))) continue;
+    const labelText = stripAccents((labelEl.textContent ?? "").toLowerCase().trim());
+    if (!normKeywords.some((k) => labelText.includes(k))) continue;
 
     const container =
       labelEl.closest(".slds-form-element") ??
@@ -243,6 +264,14 @@ function extractQru(text) {
 }
 
 function extractDate(text) {
+  const inicio =
+    findByLabel(FIELD_KEYWORDS.startDate) ??
+    findByMultilineLabel(text, FIELD_KEYWORDS.startDate);
+  if (inicio) {
+    const d = parseDate(inicio.split(" ")[0]);
+    if (d) return { value: d, confidence: 0.95 };
+  }
+
   const abertura = findByMultilineLabel(text, ["data de abertura", "data abertura"]);
   if (abertura) {
     const d = parseDate(abertura);
