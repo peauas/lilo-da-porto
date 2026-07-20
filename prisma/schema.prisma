@@ -42,6 +42,9 @@ model User {
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   resetTokens   PasswordResetToken[]
+  employees     Employee[]
+  services      Service[]
+  monthlySheets MonthlySheet[]
 }
 
 model PasswordResetToken {
