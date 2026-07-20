@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { apiError } from "@/lib/api-response";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
@@ -21,20 +22,34 @@ export async function getAuthUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
+async function userExists(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  return Boolean(user);
+}
+
 export async function requireApiAuth(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET);
-      if (payload.sub) return { userId: payload.sub as string };
+      if (payload.sub && (await userExists(payload.sub as string))) {
+        return { userId: payload.sub as string };
+      }
+      return null;
     } catch {
       return null;
     }
   }
 
   const session = await auth();
-  if (session?.user?.id) {
+  // Guard against stale JWT sessions pointing to a user that no longer exists
+  // (e.g. after a database reset). This forces a clean re-login instead of a
+  // foreign-key 500 on the first write.
+  if (session?.user?.id && (await userExists(session.user.id))) {
     return { userId: session.user.id };
   }
   return null;
