@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { serviceSchema, type ServiceInput } from "@/schemas/service.schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -14,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FormSection, Field } from "@/components/forms/form-section";
 import { Loader2 } from "lucide-react";
 
 interface EmployeeOption {
@@ -55,51 +55,65 @@ export function ServiceForm({
   const employeeId = watch("employeeId");
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Funcionário *</Label>
-          <Select value={employeeId} onValueChange={(v) => setValue("employeeId", v)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione..." />
-            </SelectTrigger>
-            <SelectContent>
-              {employees.map((e) => (
-                <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.employeeId && <p className="text-sm text-destructive">{errors.employeeId.message}</p>}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <FormSection title="Identificação" description="Funcionário e dados do serviço.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Funcionário" required error={errors.employeeId?.message}>
+            <Select value={employeeId} onValueChange={(v) => setValue("employeeId", v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Data" htmlFor="serviceDate" required error={errors.serviceDate?.message}>
+            <Input id="serviceDate" type="date" {...register("serviceDate")} />
+          </Field>
+          <Field
+            label="Nº do serviço"
+            htmlFor="serviceNumber"
+            required
+            error={errors.serviceNumber?.message}
+          >
+            <Input id="serviceNumber" {...register("serviceNumber")} />
+          </Field>
+          <Field label="QRU" htmlFor="qru">
+            <Input id="qru" {...register("qru")} />
+          </Field>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="serviceDate">Data *</Label>
-          <Input id="serviceDate" type="date" {...register("serviceDate")} />
+      </FormSection>
+
+      <FormSection title="Valores" description="Valores base e adicionais do serviço.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Valor base" htmlFor="baseValue" required error={errors.baseValue?.message}>
+            <Input id="baseValue" type="number" step="0.01" {...register("baseValue")} />
+          </Field>
+          <Field label="Valor adicional" htmlFor="additionalValue">
+            <Input
+              id="additionalValue"
+              type="number"
+              step="0.01"
+              {...register("additionalValue")}
+            />
+          </Field>
+          <Field label="Observação" htmlFor="notes" className="sm:col-span-2">
+            <Textarea id="notes" placeholder="Opcional" {...register("notes")} />
+          </Field>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="serviceNumber">Nº do serviço *</Label>
-          <Input id="serviceNumber" {...register("serviceNumber")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="qru">QRU</Label>
-          <Input id="qru" {...register("qru")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="baseValue">Valor base *</Label>
-          <Input id="baseValue" type="number" step="0.01" {...register("baseValue")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="additionalValue">Valor adicional</Label>
-          <Input id="additionalValue" type="number" step="0.01" {...register("additionalValue")} />
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="notes">Observação</Label>
-          <Textarea id="notes" {...register("notes")} />
-        </div>
+      </FormSection>
+
+      <div className="flex justify-end border-t border-border pt-6">
+        <Button type="submit" size="lg" disabled={loading}>
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {submitLabel}
+        </Button>
       </div>
-      <Button type="submit" disabled={loading}>
-        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {submitLabel}
-      </Button>
     </form>
   );
 }

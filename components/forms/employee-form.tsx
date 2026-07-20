@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { employeeSchema, type EmployeeInput } from "@/schemas/employee.schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -14,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { FormSection, Field } from "@/components/forms/form-section";
 import { Loader2 } from "lucide-react";
 
 interface EmployeeFormProps {
@@ -47,75 +48,99 @@ export function EmployeeForm({
   const status = watch("status");
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="name">Nome *</Label>
-          <Input id="name" {...register("name")} />
-          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <FormSection
+        title="Dados pessoais"
+        description="Informações de identificação do funcionário."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Nome"
+            htmlFor="name"
+            required
+            error={errors.name?.message}
+            className="sm:col-span-2"
+          >
+            <Input id="name" placeholder="Nome completo" {...register("name")} />
+          </Field>
+          <Field label="CPF" htmlFor="cpf" required error={errors.cpf?.message}>
+            <Input id="cpf" placeholder="000.000.000-00" {...register("cpf")} />
+          </Field>
+          <Field label="Telefone" htmlFor="phone">
+            <Input id="phone" placeholder="(00) 00000-0000" {...register("phone")} />
+          </Field>
+          <Field label="RG" htmlFor="rg">
+            <Input id="rg" {...register("rg")} />
+          </Field>
+          <Field label="CNH" htmlFor="cnh">
+            <Input id="cnh" {...register("cnh")} />
+          </Field>
+          <Field label="Data de nascimento" htmlFor="birthDate">
+            <Input id="birthDate" type="date" {...register("birthDate")} />
+          </Field>
+          <Field label="Status">
+            <Select
+              value={status}
+              onValueChange={(v) => setValue("status", v as "ACTIVE" | "INACTIVE")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ACTIVE">Ativo</SelectItem>
+                <SelectItem value="INACTIVE">Inativo</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="cpf">CPF *</Label>
-          <Input id="cpf" {...register("cpf")} placeholder="000.000.000-00" />
-          {errors.cpf && <p className="text-sm text-destructive">{errors.cpf.message}</p>}
+      </FormSection>
+
+      <Separator />
+
+      <FormSection title="Pagamento" description="Percentual de repasse e dados bancários.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Percentual padrão (%)"
+            htmlFor="defaultPercentage"
+            error={errors.defaultPercentage?.message}
+            hint="Aplicado por padrão nas folhas mensais."
+          >
+            <Input
+              id="defaultPercentage"
+              type="number"
+              step="0.01"
+              {...register("defaultPercentage")}
+            />
+          </Field>
+          <Field label="PIX" htmlFor="pix">
+            <Input id="pix" placeholder="Chave PIX" {...register("pix")} />
+          </Field>
+          <Field label="Banco" htmlFor="bank">
+            <Input id="bank" {...register("bank")} />
+          </Field>
+          <Field label="Agência" htmlFor="agency">
+            <Input id="agency" {...register("agency")} />
+          </Field>
+          <Field label="Conta" htmlFor="account">
+            <Input id="account" {...register("account")} />
+          </Field>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="phone">Telefone</Label>
-          <Input id="phone" {...register("phone")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="rg">RG</Label>
-          <Input id="rg" {...register("rg")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="cnh">CNH</Label>
-          <Input id="cnh" {...register("cnh")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="birthDate">Data de nascimento</Label>
-          <Input id="birthDate" type="date" {...register("birthDate")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="defaultPercentage">Percentual padrão (%)</Label>
-          <Input id="defaultPercentage" type="number" step="0.01" {...register("defaultPercentage")} />
-        </div>
-        <div className="space-y-2">
-          <Label>Status</Label>
-          <Select value={status} onValueChange={(v) => setValue("status", v as "ACTIVE" | "INACTIVE")}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ACTIVE">Ativo</SelectItem>
-              <SelectItem value="INACTIVE">Inativo</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="pix">PIX</Label>
-          <Input id="pix" {...register("pix")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="bank">Banco</Label>
-          <Input id="bank" {...register("bank")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="agency">Agência</Label>
-          <Input id="agency" {...register("agency")} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="account">Conta</Label>
-          <Input id="account" {...register("account")} />
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="notes">Observações</Label>
-          <Textarea id="notes" {...register("notes")} />
-        </div>
+      </FormSection>
+
+      <Separator />
+
+      <FormSection title="Observações" description="Anotações internas sobre o funcionário.">
+        <Field label="Observações" htmlFor="notes">
+          <Textarea id="notes" placeholder="Opcional" {...register("notes")} />
+        </Field>
+      </FormSection>
+
+      <div className="flex justify-end border-t border-border pt-6">
+        <Button type="submit" size="lg" disabled={loading}>
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {submitLabel}
+        </Button>
       </div>
-      <Button type="submit" disabled={loading}>
-        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {submitLabel}
-      </Button>
     </form>
   );
 }
