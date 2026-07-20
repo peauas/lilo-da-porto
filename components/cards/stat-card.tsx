@@ -20,25 +20,24 @@ export function StatCard({
   className,
 }: StatCardProps) {
   const displayValue =
-    format === "currency" && typeof value === "number"
-      ? formatCurrency(value)
-      : value;
+    format === "currency" && typeof value === "number" ? formatCurrency(value) : value;
 
   return (
-    <Card className={cn("animate-fade-in", className)}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-          <Icon className="h-4 w-4 text-primary" />
+    <Card
+      className={cn(
+        "animate-fade-in transition-shadow hover:shadow-md hover:shadow-slate-900/[0.06]",
+        className,
+      )}
+    >
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-2xl font-bold">{displayValue}</p>
-        {description && (
-          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-        )}
+        <p className="text-3xl font-bold tracking-tight text-foreground">{displayValue}</p>
+        {description && <p className="mt-1.5 text-xs text-muted-foreground">{description}</p>}
       </CardContent>
     </Card>
   );

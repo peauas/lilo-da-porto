@@ -68,7 +68,7 @@ export default function RegisterPage() {
 
   return (
     <div className="animate-fade-in">
-      <img src="/logo.svg" alt="Lilo da Porto" className="mb-8 h-10 w-auto object-contain" />
+      <img src="/logo-lockup.png" alt="Lilo da Porto" className="mb-8 h-14 w-auto object-contain" />
 
       <h1 className="text-2xl font-bold text-foreground">Crie sua conta</h1>
       <p className="mt-1 text-sm text-muted-foreground">
