@@ -7,7 +7,16 @@ function computeTotal(base: number, additional: number) {
   return base + additional;
 }
 
+async function assertEmployeeOwnership(employeeId: string, userId: string) {
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, userId },
+    select: { id: true },
+  });
+  if (!employee) throw new Error("NOT_FOUND");
+}
+
 export async function listServices(params: {
+  userId: string;
   year?: number;
   month?: number;
   employeeId?: string;
@@ -15,8 +24,8 @@ export async function listServices(params: {
   page?: number;
   limit?: number;
 }) {
-  const { year, month, employeeId, search, page = 1, limit = 50 } = params;
-  const where: Prisma.ServiceWhereInput = {};
+  const { userId, year, month, employeeId, search, page = 1, limit = 50 } = params;
+  const where: Prisma.ServiceWhereInput = { userId };
 
   if (employeeId) where.employeeId = employeeId;
   if (year && month) {
@@ -46,9 +55,9 @@ export async function listServices(params: {
   return { items, total, page, limit };
 }
 
-export async function getService(id: string) {
-  return prisma.service.findUnique({
-    where: { id },
+export async function getService(id: string, userId: string) {
+  return prisma.service.findFirst({
+    where: { id, userId },
     include: { employee: true },
   });
 }
@@ -56,10 +65,12 @@ export async function getService(id: string) {
 export async function checkDuplicateServiceNumber(
   employeeId: string,
   serviceNumber: string,
+  userId: string,
   excludeId?: string,
 ) {
   return prisma.service.findFirst({
     where: {
+      userId,
       employeeId,
       serviceNumber,
       ...(excludeId ? { NOT: { id: excludeId } } : {}),
@@ -71,10 +82,12 @@ export async function checkDuplicateServiceNumber(
 export async function checkDuplicateQru(
   employeeId: string,
   qru: string,
+  userId: string,
   excludeId?: string,
 ) {
   return prisma.service.findFirst({
     where: {
+      userId,
       employeeId,
       qru,
       ...(excludeId ? { NOT: { id: excludeId } } : {}),
@@ -83,10 +96,13 @@ export async function checkDuplicateQru(
   });
 }
 
-export async function createService(data: ServiceInput) {
+export async function createService(data: ServiceInput, userId: string) {
+  await assertEmployeeOwnership(data.employeeId, userId);
+
   const totalValue = computeTotal(data.baseValue, data.additionalValue ?? 0);
   const service = await prisma.service.create({
     data: {
+      userId,
       serviceNumber: data.serviceNumber,
       qru: data.qru ? data.qru.trim() : null,
       employeeId: data.employeeId,
@@ -100,12 +116,14 @@ export async function createService(data: ServiceInput) {
     include: { employee: { select: { name: true } } },
   });
 
-  await recalculateSheetForService(service.employeeId, service.serviceDate);
+  await recalculateSheetForService(service.employeeId, service.serviceDate, userId);
   return service;
 }
 
-export async function updateService(id: string, data: ServiceUpdateInput) {
-  const existing = await prisma.service.findUniqueOrThrow({ where: { id } });
+export async function updateService(id: string, data: ServiceUpdateInput, userId: string) {
+  const existing = await prisma.service.findFirst({ where: { id, userId } });
+  if (!existing) throw new Error("NOT_FOUND");
+
   const baseValue = data.baseValue ?? Number(existing.baseValue);
   const additionalValue = data.additionalValue ?? Number(existing.additionalValue);
   const totalValue = computeTotal(baseValue, additionalValue);
@@ -121,21 +139,25 @@ export async function updateService(id: string, data: ServiceUpdateInput) {
     include: { employee: { select: { name: true } } },
   });
 
-  await recalculateSheetForService(service.employeeId, service.serviceDate);
+  await recalculateSheetForService(service.employeeId, service.serviceDate, userId);
   if (data.serviceDate && existing.serviceDate !== service.serviceDate) {
-    await recalculateSheetForService(existing.employeeId, existing.serviceDate);
+    await recalculateSheetForService(existing.employeeId, existing.serviceDate, userId);
   }
   return service;
 }
 
-export async function deleteService(id: string) {
+export async function deleteService(id: string, userId: string) {
+  const existing = await prisma.service.findFirst({ where: { id, userId } });
+  if (!existing) throw new Error("NOT_FOUND");
+
   const service = await prisma.service.delete({ where: { id } });
-  await recalculateSheetForService(service.employeeId, service.serviceDate);
+  await recalculateSheetForService(service.employeeId, service.serviceDate, userId);
   return service;
 }
 
-export async function getServicesGroupedByYearMonth() {
+export async function getServicesGroupedByYearMonth(userId: string) {
   const services = await prisma.service.findMany({
+    where: { userId },
     select: { serviceDate: true },
     orderBy: { serviceDate: "desc" },
   });
@@ -157,16 +179,19 @@ export async function getServicesGroupedByYearMonth() {
     .sort((a, b) => b.year - a.year);
 }
 
-export async function getMonthStats(year: number, month: number) {
+export async function getMonthStats(year: number, month: number, userId: string) {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
   const services = await prisma.service.findMany({
-    where: { serviceDate: { gte: start, lte: end } },
+    where: { userId, serviceDate: { gte: start, lte: end } },
     include: { employee: { select: { id: true, name: true } } },
   });
 
-  const byEmployee = new Map<string, { employeeId: string; name: string; count: number; total: number }>();
+  const byEmployee = new Map<
+    string,
+    { employeeId: string; name: string; count: number; total: number }
+  >();
   for (const s of services) {
     const key = s.employeeId;
     const current = byEmployee.get(key) ?? {

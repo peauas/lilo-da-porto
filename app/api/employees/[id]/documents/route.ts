@@ -11,7 +11,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   if (!authUser) return apiError("UNAUTHORIZED", "Não autorizado", 401);
 
   const { id } = await params;
-  const documents = await listDocuments(id);
+  const documents = await listDocuments(id, authUser.userId);
   return apiSuccess(documents);
 }
 
@@ -36,14 +36,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       return apiError("VALIDATION_ERROR", "Dados inválidos", 400, parsed.error.flatten());
     }
 
-    const document = await createDocument(id, file, parsed.data);
+    const document = await createDocument(id, file, parsed.data, authUser.userId);
     return apiSuccess(document, 201);
   } catch (error) {
-    return apiError(
-      "UPLOAD_ERROR",
-      error instanceof Error ? error.message : "Erro no upload",
-      400,
-    );
+    return apiError("UPLOAD_ERROR", error instanceof Error ? error.message : "Erro no upload", 400);
   }
 }
 
@@ -55,7 +51,7 @@ export async function DELETE(request: NextRequest) {
   if (!documentId) return apiError("VALIDATION_ERROR", "documentId é obrigatório", 400);
 
   try {
-    await deleteDocument(documentId);
+    await deleteDocument(documentId, authUser.userId);
     return apiSuccess({ deleted: true });
   } catch {
     return apiError("INTERNAL_ERROR", "Erro ao excluir documento", 500);

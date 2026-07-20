@@ -12,13 +12,13 @@ export async function GET(request: NextRequest) {
   const month = request.nextUrl.searchParams.get("month");
 
   if (year && month) {
-    const stats = await getMonthStats(Number(year), Number(month));
+    const stats = await getMonthStats(Number(year), Number(month), authUser.userId);
     return apiSuccess(stats);
   }
 
   const [stats, chartData] = await Promise.all([
-    getDashboardStats(),
-    getChartData(),
+    getDashboardStats(authUser.userId),
+    getChartData(authUser.userId),
   ]);
 
   return apiSuccess({ ...stats, chartData });

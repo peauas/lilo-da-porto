@@ -2,12 +2,7 @@ import { NextRequest } from "next/server";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { requireApiAuth } from "@/lib/auth-helpers";
 import { sheetUpdateSchema } from "@/schemas/sheet.schema";
-import {
-  closeSheet,
-  getSheet,
-  reopenSheet,
-  updateSheet,
-} from "@/services/sheet.service";
+import { closeSheet, getSheet, reopenSheet, updateSheet } from "@/services/sheet.service";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,7 +11,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   if (!authUser) return apiError("UNAUTHORIZED", "Não autorizado", 401);
 
   const { id } = await params;
-  const sheet = await getSheet(id);
+  const sheet = await getSheet(id, authUser.userId);
   if (!sheet) return apiError("NOT_FOUND", "Folha não encontrada", 404);
   return apiSuccess(sheet);
 }
@@ -32,7 +27,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!parsed.success) {
       return apiError("VALIDATION_ERROR", "Dados inválidos", 400, parsed.error.flatten());
     }
-    const sheet = await updateSheet(id, parsed.data);
+    const sheet = await updateSheet(id, parsed.data, authUser.userId);
     return apiSuccess(sheet);
   } catch (error) {
     return apiError(
@@ -53,11 +48,11 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
     if (action === "close") {
-      const sheet = await closeSheet(id);
+      const sheet = await closeSheet(id, authUser.userId);
       return apiSuccess(sheet);
     }
     if (action === "reopen") {
-      const sheet = await reopenSheet(id);
+      const sheet = await reopenSheet(id, authUser.userId);
       return apiSuccess(sheet);
     }
     return apiError("INVALID_ACTION", "Ação inválida", 400);

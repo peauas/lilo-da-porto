@@ -42,6 +42,10 @@ model User {
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   resetTokens   PasswordResetToken[]
+  employees     Employee[]
+  services      Service[]
+  monthlySheets MonthlySheet[]
+  documents     EmployeeDocument[]
 }
 
 model PasswordResetToken {
@@ -57,9 +61,10 @@ model PasswordResetToken {
 
 model Employee {
   id                 String             @id @default(cuid())
+  userId             String
   name               String
   phone              String?
-  cpf                String             @unique
+  cpf                String
   rg                 String?
   cnh                String?
   birthDate          DateTime?
@@ -76,13 +81,17 @@ model Employee {
   documents          EmployeeDocument[]
   services           Service[]
   monthlySheets      MonthlySheet[]
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, cpf])
+  @@index([userId])
   @@index([status])
   @@index([name])
 }
 
 model EmployeeDocument {
   id           String           @id @default(cuid())
+  userId       String
   employeeId   String
   name         String
   category     DocumentCategory
@@ -93,12 +102,15 @@ model EmployeeDocument {
   notes        String?
   uploadedAt   DateTime         @default(now())
   employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@index([employeeId, category])
 }
 
 model Service {
   id              String        @id @default(cuid())
+  userId          String
   serviceNumber   String
   qru             String?
   employeeId      String
@@ -111,14 +123,17 @@ model Service {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, serviceNumber])
+  @@index([userId])
   @@index([serviceDate, employeeId])
   @@index([employeeId])
 }
 
 model MonthlySheet {
   id               String                @id @default(cuid())
+  userId           String
   employeeId       String
   year             Int
   month            Int
@@ -136,8 +151,10 @@ model MonthlySheet {
   updatedAt        DateTime              @updatedAt
   employee         Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   history          MonthlySheetHistory[]
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, year, month])
+  @@index([userId])
   @@index([year, month])
 }
 

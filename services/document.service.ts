@@ -2,9 +2,17 @@ import { prisma } from "@/lib/prisma";
 import { uploadDocument, deleteBlob } from "@/lib/blob";
 import type { DocumentInput } from "@/schemas/document.schema";
 
-export async function listDocuments(employeeId: string) {
+async function assertEmployeeOwnership(employeeId: string, userId: string) {
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, userId },
+    select: { id: true },
+  });
+  if (!employee) throw new Error("NOT_FOUND");
+}
+
+export async function listDocuments(employeeId: string, userId: string) {
   return prisma.employeeDocument.findMany({
-    where: { employeeId },
+    where: { employeeId, userId },
     orderBy: { uploadedAt: "desc" },
   });
 }
@@ -13,10 +21,14 @@ export async function createDocument(
   employeeId: string,
   file: File,
   data: DocumentInput,
+  userId: string,
 ) {
+  await assertEmployeeOwnership(employeeId, userId);
+
   const blob = await uploadDocument(file, employeeId, data.category);
   return prisma.employeeDocument.create({
     data: {
+      userId,
       employeeId,
       name: data.name,
       category: data.category,
@@ -29,8 +41,9 @@ export async function createDocument(
   });
 }
 
-export async function deleteDocument(id: string) {
-  const doc = await prisma.employeeDocument.findUniqueOrThrow({ where: { id } });
+export async function deleteDocument(id: string, userId: string) {
+  const doc = await prisma.employeeDocument.findFirst({ where: { id, userId } });
+  if (!doc) throw new Error("NOT_FOUND");
   try {
     await deleteBlob(doc.blobUrl);
   } catch {
@@ -39,6 +52,6 @@ export async function deleteDocument(id: string) {
   return prisma.employeeDocument.delete({ where: { id } });
 }
 
-export async function getDocument(id: string) {
-  return prisma.employeeDocument.findUnique({ where: { id } });
+export async function getDocument(id: string, userId: string) {
+  return prisma.employeeDocument.findFirst({ where: { id, userId } });
 }

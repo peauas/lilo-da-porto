@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const format = request.nextUrl.searchParams.get("format") ?? "pdf";
-  const sheet = await getSheet(id);
+  const sheet = await getSheet(id, authUser.userId);
   if (!sheet) return apiError("NOT_FOUND", "Folha não encontrada", 404);
 
   const period = `${getMonthName(sheet.month)}/${sheet.year}`;

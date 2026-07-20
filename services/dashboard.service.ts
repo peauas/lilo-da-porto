@@ -2,37 +2,33 @@ import { prisma } from "@/lib/prisma";
 import { getActiveEmployeesCount } from "@/services/employee.service";
 import { getPendingSheets } from "@/services/sheet.service";
 
-export async function getDashboardStats() {
+export async function getDashboardStats(userId: string) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
-  const [
-    activeEmployees,
-    monthServices,
-    recentServices,
-    pendingSheets,
-  ] = await Promise.all([
-    getActiveEmployeesCount(),
+  const [activeEmployees, monthServices, recentServices, pendingSheets] = await Promise.all([
+    getActiveEmployeesCount(userId),
     prisma.service.findMany({
-      where: { serviceDate: { gte: start, lte: end } },
+      where: { userId, serviceDate: { gte: start, lte: end } },
       select: { totalValue: true, serviceNumber: true },
     }),
     prisma.service.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: { employee: { select: { name: true } } },
     }),
-    getPendingSheets(),
+    getPendingSheets(userId),
   ]);
 
   const grossTotal = monthServices.reduce((acc, s) => acc + Number(s.totalValue), 0);
   const uniqueServiceNumbers = new Set(monthServices.map((s) => s.serviceNumber)).size;
 
   const employees = await prisma.employee.findMany({
-    where: { status: "ACTIVE" },
+    where: { userId, status: "ACTIVE" },
     select: { defaultPercentage: true },
   });
   const avgPercentage =
@@ -52,13 +48,13 @@ export async function getDashboardStats() {
   };
 }
 
-export async function getChartData() {
+export async function getChartData(userId: string) {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
   sixMonthsAgo.setDate(1);
 
   const services = await prisma.service.findMany({
-    where: { serviceDate: { gte: sixMonthsAgo } },
+    where: { userId, serviceDate: { gte: sixMonthsAgo } },
     select: { serviceDate: true, totalValue: true },
   });
 

@@ -11,12 +11,20 @@ export async function GET(request: NextRequest) {
   const params = Object.fromEntries(request.nextUrl.searchParams);
 
   if (params.employeeId && params.year && params.month) {
-    const sheet = await getOrCreateSheet(
-      params.employeeId,
-      Number(params.year),
-      Number(params.month),
-    );
-    return apiSuccess(sheet);
+    try {
+      const sheet = await getOrCreateSheet(
+        params.employeeId,
+        Number(params.year),
+        Number(params.month),
+        authUser.userId,
+      );
+      return apiSuccess(sheet);
+    } catch (error) {
+      if (error instanceof Error && error.message === "NOT_FOUND") {
+        return apiError("NOT_FOUND", "Funcionário não encontrado", 404);
+      }
+      return apiError("INTERNAL_ERROR", "Erro ao carregar folha", 500);
+    }
   }
 
   const parsed = sheetQuerySchema.safeParse(params);
@@ -24,7 +32,7 @@ export async function GET(request: NextRequest) {
     return apiError("VALIDATION_ERROR", "Parâmetros inválidos", 400);
   }
 
-  const result = await listSheets(parsed.data);
+  const result = await listSheets({ ...parsed.data, userId: authUser.userId });
   return apiSuccess(result.items, 200, { total: result.total });
 }
 
@@ -38,9 +46,12 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return apiError("VALIDATION_ERROR", "Dados inválidos", 400, parsed.error.flatten());
     }
-    const sheet = await createSheet(parsed.data);
+    const sheet = await createSheet(parsed.data, authUser.userId);
     return apiSuccess(sheet, 201);
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return apiError("NOT_FOUND", "Funcionário não encontrado", 404);
+    }
     return apiError("INTERNAL_ERROR", "Erro ao criar folha", 500);
   }
 }

@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   if (!authUser) return apiError("UNAUTHORIZED", "Não autorizado", 401);
 
   const { id } = await params;
-  const service = await getService(id);
+  const service = await getService(id, authUser.userId);
   if (!service) return apiError("NOT_FOUND", "Serviço não encontrado", 404);
   return apiSuccess(service);
 }
@@ -37,6 +37,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const duplicate = await checkDuplicateQru(
         parsed.data.employeeId,
         parsed.data.qru.trim(),
+        authUser.userId,
         id,
       );
       if (duplicate) {
@@ -44,9 +45,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
-    const service = await updateService(id, parsed.data);
+    const service = await updateService(id, parsed.data, authUser.userId);
     return apiSuccess(service);
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return apiError("NOT_FOUND", "Serviço não encontrado", 404);
+    }
     return apiError("INTERNAL_ERROR", "Erro ao atualizar serviço", 500);
   }
 }
@@ -57,9 +61,12 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
   const { id } = await params;
   try {
-    await deleteService(id);
+    await deleteService(id, authUser.userId);
     return apiSuccess({ deleted: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return apiError("NOT_FOUND", "Serviço não encontrado", 404);
+    }
     return apiError("INTERNAL_ERROR", "Erro ao excluir serviço", 500);
   }
 }
