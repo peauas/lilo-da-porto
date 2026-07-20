@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmployeeForm } from "@/components/forms/employee-form";
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api-client";
 import type { EmployeeInput } from "@/schemas/employee.schema";
 
 export default function NewEmployeePage() {
@@ -17,11 +18,13 @@ export default function NewEmployeePage() {
   async function onSubmit(data: EmployeeInput) {
     setLoading(true);
     try {
-      const res = await fetch("/api/employees", {
+      const res = await apiFetch("/api/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      // apiFetch already handles the redirect to /login on 401.
+      if (res.status === 401) return;
       const json = await res.json();
       if (!json.success) {
         toast.error(json.error?.message ?? "Erro ao criar funcionário");
