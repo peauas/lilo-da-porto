@@ -59,18 +59,18 @@ export default function EmployeesPage() {
         }
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm shadow-slate-900/[0.03] sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome, CPF ou telefone..."
-            className="pl-9"
+            className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -82,46 +82,64 @@ export default function EmployeesPage() {
       </div>
 
       {isLoading ? (
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       ) : data?.length ? (
-        <div className="rounded-xl border border-border bg-card">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/[0.03]">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>CPF</TableHead>
-                <TableHead>Telefone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Serviços</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Nome
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  CPF
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Telefone
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Status
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Serviços
+                </TableHead>
+                <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Ações
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((emp: {
-                id: string;
-                name: string;
-                cpf: string;
-                phone: string | null;
-                status: string;
-                _count: { services: number };
-              }) => (
-                <TableRow key={emp.id}>
-                  <TableCell className="font-medium">{emp.name}</TableCell>
-                  <TableCell>{formatCPF(emp.cpf)}</TableCell>
-                  <TableCell>{emp.phone ? formatPhone(emp.phone) : "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={emp.status === "ACTIVE" ? "success" : "secondary"}>
-                      {emp.status === "ACTIVE" ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{emp._count.services}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/employees/${emp.id}`}>Ver</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {data.map(
+                (emp: {
+                  id: string;
+                  name: string;
+                  cpf: string;
+                  phone: string | null;
+                  status: string;
+                  _count: { services: number };
+                }) => (
+                  <TableRow key={emp.id} className="transition-colors hover:bg-muted/40">
+                    <TableCell className="font-medium">{emp.name}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {formatCPF(emp.cpf)}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {emp.phone ? formatPhone(emp.phone) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={emp.status === "ACTIVE" ? "success" : "secondary"}>
+                        {emp.status === "ACTIVE" ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="tabular-nums">{emp._count.services}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/employees/${emp.id}`}>Ver</Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ),
+              )}
             </TableBody>
           </Table>
         </div>

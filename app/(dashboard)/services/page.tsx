@@ -45,17 +45,22 @@ export default function ServicesPage() {
         <div className="space-y-4">
           {data.map((yearGroup: { year: number; months: number[] }) => (
             <Card key={yearGroup.year}>
-              <CardContent className="p-4">
-                <h3 className="mb-3 text-lg font-semibold">{yearGroup.year}</h3>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <CardContent className="p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-bold tracking-tight">{yearGroup.year}</h3>
+                  <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+                    {yearGroup.months.length} {yearGroup.months.length === 1 ? "mês" : "meses"}
+                  </span>
+                </div>
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   {yearGroup.months.map((month: number) => (
                     <Link
                       key={month}
                       href={`/services/${yearGroup.year}/${month}`}
-                      className="flex items-center justify-between rounded-lg border border-border p-3 hover:bg-accent transition-colors"
+                      className="group flex items-center justify-between rounded-xl border border-border/70 bg-muted/30 p-3.5 transition-all hover:border-primary/30 hover:bg-accent"
                     >
-                      <span>{getMonthName(month)}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium capitalize">{getMonthName(month)}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                     </Link>
                   ))}
                 </div>

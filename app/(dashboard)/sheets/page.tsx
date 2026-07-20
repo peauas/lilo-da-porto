@@ -61,34 +61,42 @@ function SheetsContent() {
         <Skeleton className="h-64" />
       ) : data?.length ? (
         <div className="grid gap-3">
-          {data.map((sheet: {
-            id: string;
-            year: number;
-            month: number;
-            status: string;
-            grossTotal: string;
-            netTotal: string;
-            employee: { name: string };
-          }) => (
-            <Link key={sheet.id} href={`/sheets/${sheet.id}`}>
-              <Card className="hover:bg-accent transition-colors">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium">{sheet.employee.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {getMonthName(sheet.month)}/{sheet.year} · Bruto {formatCurrency(Number(sheet.grossTotal))} · Líquido {formatCurrency(Number(sheet.netTotal))}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={sheet.status === "CLOSED" ? "success" : "warning"}>
-                      {statusLabel[sheet.status] ?? sheet.status}
-                    </Badge>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+          {data.map(
+            (sheet: {
+              id: string;
+              year: number;
+              month: number;
+              status: string;
+              grossTotal: string;
+              netTotal: string;
+              employee: { name: string };
+            }) => (
+              <Link key={sheet.id} href={`/sheets/${sheet.id}`} className="group">
+                <Card className="transition-all hover:border-primary/30 hover:shadow-md hover:shadow-slate-900/[0.06]">
+                  <CardContent className="flex items-center justify-between gap-3 p-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{sheet.employee.name}</p>
+                      <p className="mt-0.5 text-sm capitalize text-muted-foreground">
+                        {getMonthName(sheet.month)}/{sheet.year}
+                      </p>
+                      <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                        Bruto {formatCurrency(Number(sheet.grossTotal))} · Líquido{" "}
+                        <span className="font-medium text-foreground">
+                          {formatCurrency(Number(sheet.netTotal))}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant={sheet.status === "CLOSED" ? "success" : "warning"}>
+                        {statusLabel[sheet.status] ?? sheet.status}
+                      </Badge>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ),
+          )}
         </div>
       ) : (
         <EmptyState
