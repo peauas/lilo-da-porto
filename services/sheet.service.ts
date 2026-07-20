@@ -1,17 +1,23 @@
 import { prisma } from "@/lib/prisma";
-import { calculateSheetTotals, type SheetInput, type SheetUpdateInput } from "@/schemas/sheet.schema";
+import {
+  calculateSheetTotals,
+  type SheetInput,
+  type SheetUpdateInput,
+} from "@/schemas/sheet.schema";
 import { Prisma } from "@prisma/client";
 
 async function sumServicesForPeriod(
   employeeId: string,
   year: number,
   month: number,
+  userId: string,
 ) {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
   const result = await prisma.service.aggregate({
     where: {
+      userId,
       employeeId,
       serviceDate: { gte: start, lte: end },
     },
@@ -24,18 +30,19 @@ async function sumServicesForPeriod(
 export async function recalculateSheetForService(
   employeeId: string,
   serviceDate: Date,
+  userId: string,
 ) {
   const d = new Date(serviceDate);
   const year = d.getFullYear();
   const month = d.getMonth() + 1;
 
-  const sheet = await prisma.monthlySheet.findUnique({
-    where: { employeeId_year_month: { employeeId, year, month } },
+  const sheet = await prisma.monthlySheet.findFirst({
+    where: { employeeId, year, month, userId },
   });
 
   if (!sheet || sheet.status === "CLOSED") return;
 
-  const grossTotal = await sumServicesForPeriod(employeeId, year, month);
+  const grossTotal = await sumServicesForPeriod(employeeId, year, month, userId);
   const { netTotal } = calculateSheetTotals(
     grossTotal,
     Number(sheet.percentage),
@@ -56,9 +63,10 @@ export async function getOrCreateSheet(
   employeeId: string,
   year: number,
   month: number,
+  userId: string,
 ) {
-  let sheet = await prisma.monthlySheet.findUnique({
-    where: { employeeId_year_month: { employeeId, year, month } },
+  let sheet = await prisma.monthlySheet.findFirst({
+    where: { employeeId, year, month, userId },
     include: {
       employee: true,
       history: { orderBy: { createdAt: "desc" }, take: 10 },
@@ -66,15 +74,18 @@ export async function getOrCreateSheet(
   });
 
   if (!sheet) {
-    const employee = await prisma.employee.findUniqueOrThrow({
-      where: { id: employeeId },
+    const employee = await prisma.employee.findFirst({
+      where: { id: employeeId, userId },
     });
-    const grossTotal = await sumServicesForPeriod(employeeId, year, month);
+    if (!employee) throw new Error("NOT_FOUND");
+
+    const grossTotal = await sumServicesForPeriod(employeeId, year, month, userId);
     const percentage = Number(employee.defaultPercentage);
     const { netTotal } = calculateSheetTotals(grossTotal, percentage, 0, 0, 0, 0, 0);
 
     sheet = await prisma.monthlySheet.create({
       data: {
+        userId,
         employeeId,
         year,
         month,
@@ -98,20 +109,21 @@ export async function getOrCreateSheet(
     });
   }
 
-  const services = await getSheetServices(employeeId, year, month);
+  const services = await getSheetServices(employeeId, year, month, userId);
   return { ...sheet, services };
 }
 
-async function getSheetServices(employeeId: string, year: number, month: number) {
+async function getSheetServices(employeeId: string, year: number, month: number, userId: string) {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
   return prisma.service.findMany({
-    where: { employeeId, serviceDate: { gte: start, lte: end } },
+    where: { userId, employeeId, serviceDate: { gte: start, lte: end } },
     orderBy: { serviceDate: "asc" },
   });
 }
 
 export async function listSheets(params: {
+  userId: string;
   year?: number;
   month?: number;
   employeeId?: string;
@@ -119,8 +131,8 @@ export async function listSheets(params: {
   page?: number;
   limit?: number;
 }) {
-  const { year, month, employeeId, status = "ALL", page = 1, limit = 20 } = params;
-  const where: Prisma.MonthlySheetWhereInput = {};
+  const { userId, year, month, employeeId, status = "ALL", page = 1, limit = 20 } = params;
+  const where: Prisma.MonthlySheetWhereInput = { userId };
   if (year) where.year = year;
   if (month) where.month = month;
   if (employeeId) where.employeeId = employeeId;
@@ -140,21 +152,22 @@ export async function listSheets(params: {
   return { items, total, page, limit };
 }
 
-export async function getSheet(id: string) {
-  const sheet = await prisma.monthlySheet.findUnique({
-    where: { id },
+export async function getSheet(id: string, userId: string) {
+  const sheet = await prisma.monthlySheet.findFirst({
+    where: { id, userId },
     include: {
       employee: true,
       history: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!sheet) return null;
-  const services = await getSheetServices(sheet.employeeId, sheet.year, sheet.month);
+  const services = await getSheetServices(sheet.employeeId, sheet.year, sheet.month, userId);
   return { ...sheet, services };
 }
 
-export async function updateSheet(id: string, data: SheetUpdateInput) {
-  const existing = await prisma.monthlySheet.findUniqueOrThrow({ where: { id } });
+export async function updateSheet(id: string, data: SheetUpdateInput, userId: string) {
+  const existing = await prisma.monthlySheet.findFirst({ where: { id, userId } });
+  if (!existing) throw new Error("NOT_FOUND");
   if (existing.status === "CLOSED") {
     throw new Error("Folha fechada não pode ser editada. Reabra primeiro.");
   }
@@ -163,6 +176,7 @@ export async function updateSheet(id: string, data: SheetUpdateInput) {
     existing.employeeId,
     existing.year,
     existing.month,
+    userId,
   );
 
   const percentage = data.percentage ?? Number(existing.percentage);
@@ -189,19 +203,24 @@ export async function updateSheet(id: string, data: SheetUpdateInput) {
   });
 }
 
-export async function createSheet(data: SheetInput) {
-  const existing = await prisma.monthlySheet.findUnique({
+export async function createSheet(data: SheetInput, userId: string) {
+  const employee = await prisma.employee.findFirst({
+    where: { id: data.employeeId, userId },
+    select: { id: true },
+  });
+  if (!employee) throw new Error("NOT_FOUND");
+
+  const existing = await prisma.monthlySheet.findFirst({
     where: {
-      employeeId_year_month: {
-        employeeId: data.employeeId,
-        year: data.year,
-        month: data.month,
-      },
+      userId,
+      employeeId: data.employeeId,
+      year: data.year,
+      month: data.month,
     },
   });
-  if (existing) return getOrCreateSheet(data.employeeId, data.year, data.month);
+  if (existing) return getOrCreateSheet(data.employeeId, data.year, data.month, userId);
 
-  const grossTotal = await sumServicesForPeriod(data.employeeId, data.year, data.month);
+  const grossTotal = await sumServicesForPeriod(data.employeeId, data.year, data.month, userId);
   const { netTotal } = calculateSheetTotals(
     grossTotal,
     data.percentage,
@@ -215,6 +234,7 @@ export async function createSheet(data: SheetInput) {
   const sheet = await prisma.monthlySheet.create({
     data: {
       ...data,
+      userId,
       grossTotal,
       netTotal,
     },
@@ -228,7 +248,10 @@ export async function createSheet(data: SheetInput) {
   return sheet;
 }
 
-export async function closeSheet(id: string) {
+export async function closeSheet(id: string, userId: string) {
+  const owned = await prisma.monthlySheet.findFirst({ where: { id, userId } });
+  if (!owned) throw new Error("NOT_FOUND");
+
   const sheet = await prisma.monthlySheet.update({
     where: { id },
     data: { status: "CLOSED" },
@@ -239,7 +262,10 @@ export async function closeSheet(id: string) {
   return sheet;
 }
 
-export async function reopenSheet(id: string) {
+export async function reopenSheet(id: string, userId: string) {
+  const owned = await prisma.monthlySheet.findFirst({ where: { id, userId } });
+  if (!owned) throw new Error("NOT_FOUND");
+
   const sheet = await prisma.monthlySheet.update({
     where: { id },
     data: { status: "REOPENED" },
@@ -250,13 +276,14 @@ export async function reopenSheet(id: string) {
   return sheet;
 }
 
-export async function getPendingSheets() {
+export async function getPendingSheets(userId: string) {
   const now = new Date();
   const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
   const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
 
   return prisma.monthlySheet.findMany({
     where: {
+      userId,
       OR: [
         { status: "DRAFT" },
         { status: "REOPENED" },

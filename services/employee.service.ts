@@ -7,13 +7,14 @@ function normalizeCpf(cpf: string) {
 }
 
 export async function listEmployees(params: {
+  userId: string;
   search?: string;
   status?: "ACTIVE" | "INACTIVE" | "ALL";
   page?: number;
   limit?: number;
 }) {
-  const { search, status = "ALL", page = 1, limit = 20 } = params;
-  const where: Prisma.EmployeeWhereInput = {};
+  const { userId, search, status = "ALL", page = 1, limit = 20 } = params;
+  const where: Prisma.EmployeeWhereInput = { userId };
 
   if (status !== "ALL") where.status = status;
   if (search) {
@@ -38,9 +39,9 @@ export async function listEmployees(params: {
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
-export async function getEmployee(id: string) {
-  return prisma.employee.findUnique({
-    where: { id },
+export async function getEmployee(id: string, userId: string) {
+  return prisma.employee.findFirst({
+    where: { id, userId },
     include: {
       documents: { orderBy: { uploadedAt: "desc" } },
       _count: { select: { services: true, monthlySheets: true } },
@@ -48,10 +49,11 @@ export async function getEmployee(id: string) {
   });
 }
 
-export async function createEmployee(data: EmployeeInput) {
+export async function createEmployee(data: EmployeeInput, userId: string) {
   return prisma.employee.create({
     data: {
       ...data,
+      userId,
       cpf: normalizeCpf(data.cpf),
       birthDate: data.birthDate ? new Date(data.birthDate) : null,
       address: data.address ?? Prisma.JsonNull,
@@ -59,7 +61,10 @@ export async function createEmployee(data: EmployeeInput) {
   });
 }
 
-export async function updateEmployee(id: string, data: EmployeeUpdateInput) {
+export async function updateEmployee(id: string, data: EmployeeUpdateInput, userId: string) {
+  const owned = await prisma.employee.findFirst({ where: { id, userId } });
+  if (!owned) throw new Error("NOT_FOUND");
+
   return prisma.employee.update({
     where: { id },
     data: {
@@ -72,17 +77,19 @@ export async function updateEmployee(id: string, data: EmployeeUpdateInput) {
   });
 }
 
-export async function deleteEmployee(id: string) {
+export async function deleteEmployee(id: string, userId: string) {
+  const owned = await prisma.employee.findFirst({ where: { id, userId } });
+  if (!owned) throw new Error("NOT_FOUND");
   return prisma.employee.delete({ where: { id } });
 }
 
-export async function getActiveEmployeesCount() {
-  return prisma.employee.count({ where: { status: "ACTIVE" } });
+export async function getActiveEmployeesCount(userId: string) {
+  return prisma.employee.count({ where: { userId, status: "ACTIVE" } });
 }
 
-export async function listActiveEmployees() {
+export async function listActiveEmployees(userId: string) {
   return prisma.employee.findMany({
-    where: { status: "ACTIVE" },
+    where: { userId, status: "ACTIVE" },
     orderBy: { name: "asc" },
     select: { id: true, name: true, defaultPercentage: true },
   });

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
   if (params.grouped === "true") {
-    const grouped = await getServicesGroupedByYearMonth();
+    const grouped = await getServicesGroupedByYearMonth(authUser.userId);
     return apiSuccess(grouped);
   }
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     return apiError("VALIDATION_ERROR", "Parâmetros inválidos", 400);
   }
 
-  const result = await listServices(parsed.data);
+  const result = await listServices({ ...parsed.data, userId: authUser.userId });
   return apiSuccess(result.items, 200, { total: result.total, page: result.page });
 }
 
@@ -45,12 +45,18 @@ export async function POST(request: NextRequest) {
     const duplicate = await checkDuplicateServiceNumber(
       parsed.data.employeeId,
       parsed.data.serviceNumber.trim(),
+      authUser.userId,
     );
     if (duplicate) {
-      return apiError("DUPLICATE_SERVICE", "Número de serviço já existe para este funcionário", 409, duplicate);
+      return apiError(
+        "DUPLICATE_SERVICE",
+        "Número de serviço já existe para este funcionário",
+        409,
+        duplicate,
+      );
     }
 
-    const service = await createService(parsed.data);
+    const service = await createService(parsed.data, authUser.userId);
     return apiSuccess(service, 201);
   } catch {
     return apiError("INTERNAL_ERROR", "Erro ao criar serviço", 500);

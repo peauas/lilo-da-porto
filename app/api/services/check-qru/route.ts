@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
   const duplicate = await checkDuplicateServiceNumber(
     parsed.data.employeeId,
     parsed.data.serviceNumber.trim(),
+    authUser.userId,
     parsed.data.excludeId,
   );
 

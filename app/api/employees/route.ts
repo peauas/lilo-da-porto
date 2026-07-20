@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     return apiError("VALIDATION_ERROR", "Parâmetros inválidos", 400);
   }
 
-  const result = await listEmployees(parsed.data);
+  const result = await listEmployees({ ...parsed.data, userId: authUser.userId });
   return apiSuccess(result.items, 200, {
     page: result.page,
     total: result.total,
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return apiError("VALIDATION_ERROR", "Dados inválidos", 400, parsed.error.flatten());
     }
 
-    const employee = await createEmployee(parsed.data);
+    const employee = await createEmployee(parsed.data, authUser.userId);
     return apiSuccess(employee, 201);
   } catch (error) {
     if ((error as { code?: string }).code === "P2002") {

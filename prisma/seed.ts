@@ -20,10 +20,11 @@ async function main() {
 
   console.log(`Admin user: ${user.email}`);
 
-  const employeeCount = await prisma.employee.count();
+  const employeeCount = await prisma.employee.count({ where: { userId: user.id } });
   if (employeeCount === 0) {
     await prisma.employee.create({
       data: {
+        userId: user.id,
         name: "Funcionário Exemplo",
         cpf: "12345678901",
         phone: "11999999999",
