@@ -19,8 +19,17 @@ function formatCurrency(value) {
 
 function formatDate(value) {
   if (!value) return "";
-  const date = typeof value === "string" ? new Date(value) : value;
-  return new Intl.DateTimeFormat("pt-BR").format(date);
+  // Datas no formato "YYYY-MM-DD" devem ser tratadas como data local,
+  // senão new Date() interpreta como UTC e o fuso (UTC-3) retrocede um dia.
+  if (typeof value === "string") {
+    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      return `${day}/${month}/${year}`;
+    }
+    return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
+  }
+  return new Intl.DateTimeFormat("pt-BR").format(value);
 }
 
 function formatFieldValue(key, value) {
@@ -39,7 +48,9 @@ function normalizeCpf(value) {
 
 function findExactEmployeeMatch(list, name, cpf) {
   const normalizedCpf = normalizeCpf(cpf);
-  const normalizedName = String(name || "").trim().toLowerCase();
+  const normalizedName = String(name || "")
+    .trim()
+    .toLowerCase();
   return (
     list.find((emp) => normalizeCpf(emp.cpf) === normalizedCpf) ||
     list.find((emp) => emp.name?.trim().toLowerCase() === normalizedName) ||
@@ -118,7 +129,10 @@ async function captureFromPage() {
       }
       if (!response?.success) {
         const detail = response?.details ? `: ${response.details}` : "";
-        setStatus(response?.error ? `${response.error}${detail}` : `Erro na captura${detail}`, "error");
+        setStatus(
+          response?.error ? `${response.error}${detail}` : `Erro na captura${detail}`,
+          "error",
+        );
         return resolve(false);
       }
       extractedData = response.data;
@@ -237,7 +251,8 @@ function renderFields(data) {
   }
   for (const [key, field] of Object.entries(data)) {
     if (key === "qru") continue;
-    if (!field?.value && key !== "baseValue" && key !== "additionalValue" && key !== "totalValue") continue;
+    if (!field?.value && key !== "baseValue" && key !== "additionalValue" && key !== "totalValue")
+      continue;
     const row = document.createElement("div");
     row.className = "field-row";
     const label = FIELD_LABELS[key] || key;
@@ -305,7 +320,7 @@ document.getElementById("submit-btn").addEventListener("click", async () => {
 
 function showDuplicateDialog(payload) {
   const confirmed = confirm(
-    `Serviço ${duplicateService.serviceNumber} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`
+    `Serviço ${duplicateService.serviceNumber} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`,
   );
   if (confirmed && duplicateService) {
     updateExisting(payload);

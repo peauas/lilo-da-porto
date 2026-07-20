@@ -2,10 +2,9 @@ import { NextRequest } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { requireApiAuth } from "@/lib/auth-helpers";
 import { getSheet } from "@/services/sheet.service";
-import { getMonthName, formatCurrency, formatDate } from "@/lib/utils";
+import { getMonthName, formatDate } from "@/lib/utils";
+import { buildMonthlySheetPdf } from "@/lib/pdf/monthly-sheet";
 import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,12 +39,11 @@ export async function GET(request: NextRequest, { params }: Params) {
     ]);
 
     const details = workbook.addWorksheet("Serviços");
-    details.addRow(["Data", "Nº Serviço", "QRU", "Valor Base", "Adicional", "Total"]);
+    details.addRow(["Data", "Nº Serviço", "Valor Base", "Adicional", "Total"]);
     for (const s of sheet.services) {
       details.addRow([
         formatDate(s.serviceDate),
         s.serviceNumber,
-        s.qru,
         Number(s.baseValue),
         Number(s.additionalValue),
         Number(s.totalValue),
@@ -61,42 +59,28 @@ export async function GET(request: NextRequest, { params }: Params) {
     });
   }
 
-  const doc = new jsPDF();
-  doc.setFontSize(18);
-  doc.setTextColor(0, 48, 135);
-  doc.text("Lilo da Porto", 14, 20);
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
-  doc.text(`Folha Mensal - ${period}`, 14, 30);
-  doc.text(`Funcionário: ${sheet.employee.name}`, 14, 38);
-
-  autoTable(doc, {
-    startY: 48,
-    head: [["Campo", "Valor"]],
-    body: [
-      ["Valor bruto", formatCurrency(Number(sheet.grossTotal))],
-      ["Percentual", `${sheet.percentage}%`],
-      ["Ajuda de custo", formatCurrency(Number(sheet.costAllowance))],
-      ["Vale", formatCurrency(Number(sheet.voucher))],
-      ["INSS", formatCurrency(Number(sheet.inss))],
-      ["Coparticipação", formatCurrency(Number(sheet.coparticipation))],
-      ["Outros descontos", formatCurrency(Number(sheet.otherDiscounts))],
-      ["Valor líquido", formatCurrency(Number(sheet.netTotal))],
-    ],
+  const pdfBuffer = buildMonthlySheetPdf({
+    employee: { name: sheet.employee.name },
+    year: sheet.year,
+    month: sheet.month,
+    status: sheet.status,
+    grossTotal: Number(sheet.grossTotal),
+    percentage: Number(sheet.percentage),
+    costAllowance: Number(sheet.costAllowance),
+    voucher: Number(sheet.voucher),
+    inss: Number(sheet.inss),
+    coparticipation: Number(sheet.coparticipation),
+    otherDiscounts: Number(sheet.otherDiscounts),
+    netTotal: Number(sheet.netTotal),
+    services: sheet.services.map((s) => ({
+      serviceDate: s.serviceDate,
+      serviceNumber: s.serviceNumber,
+      baseValue: Number(s.baseValue),
+      additionalValue: Number(s.additionalValue),
+      totalValue: Number(s.totalValue),
+    })),
   });
 
-  autoTable(doc, {
-    startY: (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10,
-    head: [["Data", "Serviço", "QRU", "Total"]],
-    body: sheet.services.map((s) => [
-      formatDate(s.serviceDate),
-      s.serviceNumber,
-      s.qru,
-      formatCurrency(Number(s.totalValue)),
-    ]),
-  });
-
-  const pdfBuffer = doc.output("arraybuffer");
   return new Response(pdfBuffer, {
     headers: {
       "Content-Type": "application/pdf",
