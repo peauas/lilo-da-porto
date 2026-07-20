@@ -25,6 +25,7 @@ const FIELD_KEYWORDS = {
   baseValue: ["valor base", "valor serviço", "valor do serviço", "custos da ordem"],
   additionalValue: ["adicional", "valor adicional", "extra"],
   totalValue: ["valor total", "total geral", "custos da ordem de serviço", "total"],
+  attendanceDate: ["data de atendimento", "data atendimento", "data do atendimento"],
   serviceDate: [
     "data de abertura",
     "data abertura",
@@ -58,7 +59,10 @@ function stripAccents(value) {
 /** Label na linha N, valor na linha N+1 (padrão Salesforce Lightning) */
 function findByMultilineLabel(text, keywords) {
   const normKeywords = keywords.map((k) => stripAccents(k.toLowerCase()));
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   for (let i = 0; i < lines.length - 1; i++) {
     const line = stripAccents(lines[i].toLowerCase());
     if (normKeywords.some((k) => line === k || line.startsWith(k + " ") || line.includes(k))) {
@@ -264,9 +268,24 @@ function extractQru(text) {
 }
 
 function extractDate(text) {
+  // Prioridade máxima: Data de Atendimento
+  const atendimento =
+    findByLabel(FIELD_KEYWORDS.attendanceDate) ??
+    findByMultilineLabel(text, FIELD_KEYWORDS.attendanceDate);
+  if (atendimento) {
+    const d = parseDate(atendimento.split(" ")[0]);
+    if (d) return { value: d, confidence: 0.98 };
+  }
+
+  // Fallback via regex direto no texto: "Data de Atendimento ... 15/07/2026"
+  const atendimentoText = text.match(/Data de Atendimento[\s\S]{0,60}?(\d{2}\/\d{2}\/\d{4})/i);
+  if (atendimentoText) {
+    const d = parseDate(atendimentoText[1]);
+    if (d) return { value: d, confidence: 0.9 };
+  }
+
   const inicio =
-    findByLabel(FIELD_KEYWORDS.startDate) ??
-    findByMultilineLabel(text, FIELD_KEYWORDS.startDate);
+    findByLabel(FIELD_KEYWORDS.startDate) ?? findByMultilineLabel(text, FIELD_KEYWORDS.startDate);
   if (inicio) {
     const d = parseDate(inicio.split(" ")[0]);
     if (d) return { value: d, confidence: 0.95 };
@@ -302,10 +321,7 @@ function extractValues(text) {
   let totalValue = null;
   let confidence = 0.3;
 
-  const custosLine = findByMultilineLabel(text, [
-    "custos da ordem de serviço",
-    "custos da ordem",
-  ]);
+  const custosLine = findByMultilineLabel(text, ["custos da ordem de serviço", "custos da ordem"]);
   if (custosLine) {
     totalValue = parseMoney(custosLine);
     baseValue = totalValue;
@@ -313,9 +329,7 @@ function extractValues(text) {
   }
 
   if (!totalValue) {
-    const custosBlock = text.match(
-      /Custos da Ordem de Servi[çc]o[\s\S]{0,80}?(R\$\s*[\d.,]+)/i,
-    );
+    const custosBlock = text.match(/Custos da Ordem de Servi[çc]o[\s\S]{0,80}?(R\$\s*[\d.,]+)/i);
     if (custosBlock) {
       totalValue = parseMoney(custosBlock[1]);
       baseValue = totalValue;
