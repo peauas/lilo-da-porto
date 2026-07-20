@@ -1,51 +1,65 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { loginSchema, type LoginInput } from "@/schemas/auth.schema";
+import { registerSchema, type RegisterInput } from "@/schemas/auth.schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 
-function LoginForm() {
+export default function RegisterPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<RegisterInput>({
+    resolver: zodResolver(registerSchema),
   });
 
-  async function onSubmit(data: LoginInput) {
+  async function onSubmit(data: RegisterInput) {
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        toast.error(result?.error?.message ?? "Erro ao cadastrar usuário");
+        return;
+      }
+
+      toast.success("Conta criada com sucesso");
+
+      const signInResult = await signIn("credentials", {
         email: data.email,
         password: data.password,
         redirect: false,
       });
 
-      if (result?.error) {
-        toast.error("E-mail ou senha incorretos");
+      if (signInResult?.error) {
+        toast.info("Conta criada. Faça login para continuar.");
+        router.push("/login");
         return;
       }
 
-      toast.success("Login realizado com sucesso");
-      router.push(searchParams.get("callbackUrl") ?? "/");
+      router.push("/");
       router.refresh();
     } catch {
-      toast.error("Erro ao fazer login");
+      toast.error("Erro ao cadastrar usuário");
     } finally {
       setLoading(false);
     }
@@ -58,10 +72,15 @@ function LoginForm() {
           <div className="mx-auto mb-4 flex h-24 w-full max-w-[280px] items-center justify-center rounded-[28px] bg-muted/80 p-4">
             <img src="/logo.svg" alt="Logo" className="h-16 w-auto object-contain" />
           </div>
-          <CardDescription>Entre para gerenciar folhas e serviços</CardDescription>
+          <CardDescription>Crie sua conta para começar</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome</Label>
+              <Input id="name" type="text" placeholder="Seu nome" {...register("name")} />
+              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input id="email" type="email" placeholder="seu@email.com" {...register("email")} />
@@ -79,34 +98,31 @@ function LoginForm() {
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar senha</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                {...register("confirmPassword")}
+              />
+              {errors.confirmPassword && (
+                <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+              )}
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Entrar
+              Cadastrar
             </Button>
             <p className="text-center text-sm">
-              <Link href="/forgot-password" className="text-primary hover:underline">
-                Esqueci minha senha
-              </Link>
-            </p>
-            <p className="text-center text-sm">
-              Não tem uma conta?{" "}
-              <Link href="/register" className="text-primary hover:underline">
-                Cadastre-se
+              Já tem uma conta?{" "}
+              <Link href="/login" className="text-primary hover:underline">
+                Fazer login
               </Link>
             </p>
           </form>
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={<div className="flex min-h-screen items-center justify-center">Carregando...</div>}
-    >
-      <LoginForm />
-    </Suspense>
   );
 }
