@@ -39,9 +39,14 @@ export async function POST(request: NextRequest) {
     const employee = await createEmployee(parsed.data, authUser.userId);
     return apiSuccess(employee, 201);
   } catch (error) {
-    if ((error as { code?: string }).code === "P2002") {
+    const code = (error as { code?: string }).code;
+    if (code === "P2002") {
       return apiError("DUPLICATE_CPF", "CPF já cadastrado", 409);
     }
+    if (code === "P2003") {
+      return apiError("SESSION_EXPIRED", "Sessão inválida. Faça login novamente.", 401);
+    }
+    console.error("[v0] Erro ao criar funcionário:", error);
     return apiError("INTERNAL_ERROR", "Erro ao criar funcionário", 500);
   }
 }
