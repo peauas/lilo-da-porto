@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth-edge";
 
-const publicRoutes = ["/login", "/forgot-password", "/reset-password"];
+const publicRoutes = ["/login", "/register", "/forgot-password", "/reset-password"];
 const authApiRoutes = ["/api/auth"];
 
 export default auth((request) => {
@@ -14,17 +14,14 @@ export default auth((request) => {
     authApiRoutes.some((r) => pathname.startsWith(r));
 
   if (isPublic) {
-    if (pathname === "/login" && isLoggedIn) {
+    if ((pathname === "/login" || pathname === "/register") && isLoggedIn) {
       return NextResponse.redirect(new URL("/", request.url));
     }
     return NextResponse.next();
   }
 
   if (pathname.startsWith("/api/")) {
-    if (
-      pathname.startsWith("/api/auth") ||
-      pathname === "/api/health"
-    ) {
+    if (pathname.startsWith("/api/auth") || pathname === "/api/health") {
       return NextResponse.next();
     }
     if (!isLoggedIn) {
