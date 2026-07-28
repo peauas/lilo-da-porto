@@ -13,9 +13,34 @@ export function formatCurrency(value: number | string) {
   }).format(num || 0);
 }
 
+/**
+ * Colunas "pura data" (@db.Date no Prisma, ex: Service.serviceDate) chegam
+ * sempre como meia-noite UTC. Formatar com o fuso local (ex: America/Sao_Paulo,
+ * UTC-3) exibe o dia anterior. Timestamps reais (createdAt, uploadedAt) quase
+ * nunca caem exatamente em meia-noite UTC, então detectamos o caso pela hora.
+ */
 export function formatDate(date: Date | string) {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("pt-BR").format(d);
+  const isDateOnly =
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0;
+  return new Intl.DateTimeFormat("pt-BR", isDateOnly ? { timeZone: "UTC" } : undefined).format(d);
+}
+
+/** Ano/mês (UTC) de uma coluna "pura data" — ver nota em formatDate. */
+export function getUTCYearMonth(date: Date | string): { year: number; month: number } {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+}
+
+/** Início/fim (inclusive) de um mês em UTC, para comparar com colunas "pura data". */
+export function monthRangeUTC(year: number, month: number): { start: Date; end: Date } {
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1)),
+    end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),
+  };
 }
 
 export function formatCPF(cpf: string) {

@@ -4,6 +4,7 @@ import {
   type SheetInput,
   type SheetUpdateInput,
 } from "@/schemas/sheet.schema";
+import { getUTCYearMonth, monthRangeUTC } from "@/lib/utils";
 import { Prisma } from "@prisma/client";
 
 async function sumServicesForPeriod(
@@ -12,8 +13,7 @@ async function sumServicesForPeriod(
   month: number,
   userId: string,
 ) {
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59);
+  const { start, end } = monthRangeUTC(year, month);
 
   const result = await prisma.service.aggregate({
     where: {
@@ -32,9 +32,7 @@ export async function recalculateSheetForService(
   serviceDate: Date,
   userId: string,
 ) {
-  const d = new Date(serviceDate);
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
+  const { year, month } = getUTCYearMonth(serviceDate);
 
   const sheet = await prisma.monthlySheet.findFirst({
     where: { employeeId, year, month, userId },

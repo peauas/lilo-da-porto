@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { ServiceInput, ServiceUpdateInput } from "@/schemas/service.schema";
 import { recalculateSheetForService } from "@/services/sheet.service";
+import { getUTCYearMonth, monthRangeUTC } from "@/lib/utils";
 import { Prisma } from "@prisma/client";
 
 function computeTotal(base: number, additional: number) {
@@ -29,8 +30,7 @@ export async function listServices(params: {
 
   if (employeeId) where.employeeId = employeeId;
   if (year && month) {
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0, 23, 59, 59);
+    const { start, end } = monthRangeUTC(year, month);
     where.serviceDate = { gte: start, lte: end };
   }
   if (search) {
@@ -164,9 +164,7 @@ export async function getServicesGroupedByYearMonth(userId: string) {
 
   const grouped = new Map<number, Set<number>>();
   for (const s of services) {
-    const d = new Date(s.serviceDate);
-    const year = d.getFullYear();
-    const month = d.getMonth() + 1;
+    const { year, month } = getUTCYearMonth(s.serviceDate);
     if (!grouped.has(year)) grouped.set(year, new Set());
     grouped.get(year)!.add(month);
   }
@@ -180,8 +178,7 @@ export async function getServicesGroupedByYearMonth(userId: string) {
 }
 
 export async function getMonthStats(year: number, month: number, userId: string) {
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59);
+  const { start, end } = monthRangeUTC(year, month);
 
   const services = await prisma.service.findMany({
     where: { userId, serviceDate: { gte: start, lte: end } },
