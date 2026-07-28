@@ -10,7 +10,7 @@
   <div id="app">
     <header class="header">
       <div class="logo">
-        <img src="icons/logo.svg" alt="Logo" />
+        <img src="icons/logo.png" alt="Lilo da Porto" />
       </div>
     </header>
 
@@ -27,20 +27,32 @@
 
     <section id="main-section" class="section hidden">
       <div class="field">
-        <label>Funcionário *</label>
+        <label for="employee">Funcionário *</label>
         <select id="employee"></select>
+        <p id="employee-hint" class="hint hidden"></p>
       </div>
 
+      <div class="fields-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Dados capturados</span>
+      </div>
       <div id="fields" class="fields"></div>
 
       <div class="actions">
-        <button id="capture-btn" class="btn secondary">Capturar da página</button>
-        <button id="submit-btn" class="btn primary">Enviar serviço</button>
+        <button id="capture-btn" class="btn secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Capturar da página
+        </button>
+        <button id="submit-btn" class="btn primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+          Enviar serviço
+        </button>
       </div>
       <p id="status" class="status"></p>
     </section>
 
-    <section id="loading" class="section">
+    <section id="loading" class="section loading-section">
+      <span class="spinner" aria-hidden="true"></span>
       <p>Carregando...</p>
     </section>
   </div>

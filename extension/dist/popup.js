@@ -46,15 +46,42 @@ function normalizeCpf(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+/** Remove acentos para comparação tolerante (ex: "José" === "jose") */
+function stripAccents(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function nameTokens(name) {
+  return stripAccents(String(name || "").toLowerCase())
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** Ignora nomes do meio: "Paulo Cesar Dias" casa com "Paulo Dias" */
+function namesMatchByFirstLast(nameA, nameB) {
+  const a = nameTokens(nameA);
+  const b = nameTokens(nameB);
+  if (!a.length || !b.length) return false;
+  return a[0] === b[0] && a[a.length - 1] === b[b.length - 1];
+}
+
+function firstAndLastTokens(name) {
+  const tokens = nameTokens(name);
+  if (!tokens.length) return null;
+  return { first: tokens[0], last: tokens[tokens.length - 1] };
+}
+
 function findExactEmployeeMatch(list, name, cpf) {
   const normalizedCpf = normalizeCpf(cpf);
-  const normalizedName = String(name || "")
-    .trim()
-    .toLowerCase();
+  const normalizedName = stripAccents(String(name || "").trim().toLowerCase());
   return (
-    list.find((emp) => normalizeCpf(emp.cpf) === normalizedCpf) ||
-    list.find((emp) => emp.name?.trim().toLowerCase() === normalizedName) ||
-    list.find((emp) => emp.name?.trim().toLowerCase().includes(normalizedName))
+    (normalizedCpf && list.find((emp) => normalizeCpf(emp.cpf) === normalizedCpf)) ||
+    list.find((emp) => stripAccents(emp.name?.trim().toLowerCase() || "") === normalizedName) ||
+    list.find((emp) => namesMatchByFirstLast(emp.name, name)) ||
+    list.find((emp) => stripAccents(emp.name?.trim().toLowerCase() || "").includes(normalizedName))
   );
 }
 
@@ -84,6 +111,23 @@ async function getOrCreateEmployee(extracted) {
     const byCpf = await searchEmployees(cpf);
     employee = findExactEmployeeMatch(byCpf, name, cpf);
     if (employee) return employee;
+  }
+
+  // A busca da API é por substring, então mandar o nome inteiro capturado
+  // (ex: "PAULO CESAR DIAS") raramente casa com o nome cadastrado (ex:
+  // "Paulo Dias"). Buscar pelo primeiro e pelo último nome separadamente
+  // encontra o candidato certo mesmo com nomes do meio diferentes.
+  const tokens = firstAndLastTokens(name);
+  if (tokens) {
+    const byFirstName = await searchEmployees(tokens.first);
+    employee = findExactEmployeeMatch(byFirstName, name, cpf);
+    if (employee) return employee;
+
+    if (tokens.last !== tokens.first) {
+      const byLastName = await searchEmployees(tokens.last);
+      employee = findExactEmployeeMatch(byLastName, name, cpf);
+      if (employee) return employee;
+    }
   }
 
   const byName = await searchEmployees(name);
@@ -120,7 +164,8 @@ async function getOrCreateEmployee(extracted) {
 }
 
 async function captureFromPage() {
-  setStatus("Capturando dados...", "");
+  hideEmployeeHint();
+  setStatus("Capturando dados...", "loading");
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: "GET_TAB_DATA" }, async (response) => {
       if (chrome.runtime.lastError) {
@@ -144,6 +189,16 @@ async function captureFromPage() {
   });
 }
 
+function hideEmployeeHint() {
+  document.getElementById("employee-hint").classList.add("hidden");
+}
+
+function showEmployeeHint(name) {
+  const hint = document.getElementById("employee-hint");
+  hint.textContent = `Detectado automaticamente: ${name}`;
+  hint.classList.remove("hidden");
+}
+
 async function autoSelectEmployee() {
   if (!extractedData) return;
   const employee = await getOrCreateEmployee(extractedData);
@@ -160,7 +215,7 @@ async function autoSelectEmployee() {
     select.appendChild(opt);
   });
   select.value = employee.id;
-  setStatus(`Funcionário automaticamente selecionado: ${employee.name}`, "success");
+  showEmployeeHint(employee.name);
 }
 
 let token = null;
@@ -254,7 +309,7 @@ function renderFields(data) {
     if (!field?.value && key !== "baseValue" && key !== "additionalValue" && key !== "totalValue")
       continue;
     const row = document.createElement("div");
-    row.className = "field-row";
+    row.className = key === "totalValue" ? "field-row field-row-total" : "field-row";
     const label = FIELD_LABELS[key] || key;
     const lowConf = field.confidence < 0.6;
     const formattedValue = formatFieldValue(key, field.value);
@@ -267,9 +322,24 @@ function renderFields(data) {
 }
 
 document.getElementById("capture-btn").addEventListener("click", captureFromPage);
+document.getElementById("employee").addEventListener("change", hideEmployeeHint);
+
+function resetForm() {
+  extractedData = null;
+  duplicateService = null;
+  renderFields(null);
+  hideEmployeeHint();
+  document.getElementById("employee").value = "";
+}
+
+function setSuccessAndReset(message) {
+  resetForm();
+  setStatus(`${message} Pronto para capturar o próximo serviço.`, "success");
+}
 
 document.getElementById("submit-btn").addEventListener("click", async () => {
-  const employeeId = document.getElementById("employee").value;
+  const employeeSelect = document.getElementById("employee");
+  const employeeId = employeeSelect.value;
   if (!employeeId) {
     setStatus("Selecione um funcionário", "error");
     return;
@@ -279,6 +349,7 @@ document.getElementById("submit-btn").addEventListener("click", async () => {
     return;
   }
 
+  const employeeName = employeeSelect.selectedOptions[0]?.textContent || "";
   const payload = {
     employeeId,
     serviceNumber: String(extractedData.serviceNumber.value).trim(),
@@ -288,7 +359,7 @@ document.getElementById("submit-btn").addEventListener("click", async () => {
     origin: "EXTENSION",
   };
 
-  setStatus("Enviando...", "");
+  setStatus("Enviando...", "loading");
 
   try {
     const res = await fetch(`${apiUrl}/api/services`, {
@@ -303,7 +374,7 @@ document.getElementById("submit-btn").addEventListener("click", async () => {
 
     if (res.status === 409) {
       duplicateService = json.error.details;
-      showDuplicateDialog(payload);
+      showDuplicateDialog(payload, employeeName);
       return;
     }
 
@@ -312,24 +383,24 @@ document.getElementById("submit-btn").addEventListener("click", async () => {
       return;
     }
 
-    setStatus("Serviço enviado com sucesso!", "success");
+    setSuccessAndReset(`Serviço ${payload.serviceNumber} enviado para ${employeeName}!`);
   } catch {
     setStatus("Erro de conexão", "error");
   }
 });
 
-function showDuplicateDialog(payload) {
+function showDuplicateDialog(payload, employeeName) {
   const confirmed = confirm(
     `Serviço ${duplicateService.serviceNumber} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`,
   );
   if (confirmed && duplicateService) {
-    updateExisting(payload);
+    updateExisting(payload, employeeName);
   } else {
     setStatus("Envio cancelado", "");
   }
 }
 
-async function updateExisting(payload) {
+async function updateExisting(payload, employeeName) {
   try {
     const res = await fetch(`${apiUrl}/api/services/${duplicateService.id}`, {
       method: "PATCH",
@@ -341,7 +412,7 @@ async function updateExisting(payload) {
     });
     const json = await res.json();
     if (json.success) {
-      setStatus("Serviço atualizado com sucesso!", "success");
+      setSuccessAndReset(`Serviço ${payload.serviceNumber} atualizado para ${employeeName}!`);
     } else {
       setStatus(json.error?.message || "Erro ao atualizar", "error");
     }
@@ -352,8 +423,14 @@ async function updateExisting(payload) {
 
 function setStatus(msg, type) {
   const el = document.getElementById("status");
-  el.textContent = msg;
   el.className = `status ${type}`;
+  if (type === "loading") {
+    el.innerHTML = `<span class="spinner spinner-inline" aria-hidden="true"></span>${msg}`;
+  } else if (type === "success") {
+    el.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span>${msg}</span>`;
+  } else {
+    el.textContent = msg;
+  }
 }
 
 init();

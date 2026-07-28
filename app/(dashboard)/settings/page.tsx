@@ -4,13 +4,15 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download, Puzzle } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { changePasswordSchema, type ChangePasswordInput } from "@/schemas/auth.schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import extensionManifest from "@/extension/manifest.json";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,45 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-lg space-y-6 animate-fade-in">
       <PageHeader title="Configurações" description="Gerencie sua conta" />
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <Puzzle className="h-4 w-4 text-primary" />
+              Extensão do Chrome
+            </CardTitle>
+            <Badge variant="secondary">v{extensionManifest.version}</Badge>
+          </div>
+          <CardDescription>
+            Capture serviços do portal Porto direto do navegador e envie para o sistema em um
+            clique
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button asChild>
+            <a href="/downloads/lilo-da-porto-extension.zip" download>
+              <Download className="mr-2 h-4 w-4" />
+              Baixar extensão (.zip)
+            </a>
+          </Button>
+
+          <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <p className="mb-2 text-sm font-medium text-foreground">Como instalar</p>
+            <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
+              <li>Baixe e extraia o arquivo .zip</li>
+              <li>
+                Abra{" "}
+                <code className="rounded bg-secondary px-1 py-0.5 text-xs text-secondary-foreground">
+                  chrome://extensions
+                </code>
+              </li>
+              <li>Ative o &quot;Modo do desenvolvedor&quot; no canto superior direito</li>
+              <li>Clique em &quot;Carregar sem compactação&quot; e selecione a pasta extraída</li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
