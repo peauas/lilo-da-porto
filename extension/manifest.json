@@ -34,9 +34,19 @@
         "https://*.porto/*",
         "https://*.my.site.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["config.js", "capture-shared.js", "content.js", "panel.js"],
       "run_at": "document_idle",
       "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/icon-32.png"],
+      "matches": [
+        "https://*.portoseguro.com.br/*",
+        "https://*.porto/*",
+        "https://*.my.site.com/*"
+      ]
     }
   ],
   "icons": {
