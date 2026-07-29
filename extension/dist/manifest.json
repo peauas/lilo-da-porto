@@ -41,7 +41,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/icon-32.png"],
+      "resources": ["icons/icon-32.png", "icons/logo.png"],
       "matches": [
         "https://*.portoseguro.com.br/*",
         "https://*.porto/*",
