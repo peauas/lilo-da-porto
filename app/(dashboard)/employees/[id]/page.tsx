@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Pencil, Trash2, Download, FileText } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Download, Wrench, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,9 @@ export default function EmployeeDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -158,6 +161,18 @@ export default function EmployeeDetailPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
+              <Link href={`/services/${currentYear}/${currentMonth}/${id}`}>
+                <Wrench className="mr-2 h-4 w-4" />
+                Serviços do mês
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/sheets?employeeId=${id}&year=${currentYear}&month=${currentMonth}`}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Folha do mês
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
               <Link href={`/employees/${id}/edit`}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Editar
@@ -194,12 +209,12 @@ export default function EmployeeDetailPage({
                 <span className="text-muted-foreground">Nascimento:</span>{" "}
                 {employee.birthDate ? formatDate(employee.birthDate) : "—"}
               </p>
-              <p>
-                <span className="text-muted-foreground">Status:</span>{" "}
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Status:</span>
                 <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>
                   {employee.status === "ACTIVE" ? "Ativo" : "Inativo"}
                 </Badge>
-              </p>
+              </div>
             </CardContent>
           </Card>
 

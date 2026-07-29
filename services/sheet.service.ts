@@ -27,6 +27,46 @@ async function sumServicesForPeriod(
   return Number(result._sum.totalValue ?? 0);
 }
 
+/**
+ * Cria a folha em rascunho (DRAFT) do zero, já com o total apurado a
+ * partir dos serviços existentes no período. Usada tanto ao acessar um
+ * período pela primeira vez quanto ao lançar/editar/excluir um serviço
+ * de um mês que ainda não tem folha.
+ */
+async function createDraftSheet(employeeId: string, year: number, month: number, userId: string) {
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, userId },
+  });
+  if (!employee) return null;
+
+  const grossTotal = await sumServicesForPeriod(employeeId, year, month, userId);
+  const percentage = Number(employee.defaultPercentage);
+  const { netTotal } = calculateSheetTotals(grossTotal, percentage, 0, 0, 0, 0, 0);
+
+  const sheet = await prisma.monthlySheet.create({
+    data: {
+      userId,
+      employeeId,
+      year,
+      month,
+      percentage,
+      grossTotal,
+      netTotal,
+      status: "DRAFT",
+    },
+  });
+
+  await prisma.monthlySheetHistory.create({
+    data: {
+      sheetId: sheet.id,
+      action: "CREATED",
+      details: { year, month },
+    },
+  });
+
+  return sheet;
+}
+
 export async function recalculateSheetForService(
   employeeId: string,
   serviceDate: Date,
@@ -38,7 +78,14 @@ export async function recalculateSheetForService(
     where: { employeeId, year, month, userId },
   });
 
-  if (!sheet || sheet.status === "CLOSED") return;
+  if (sheet?.status === "CLOSED") return;
+
+  if (!sheet) {
+    // Sem folha ainda para esse mês — cria já com o total correto
+    // (o serviço que disparou essa chamada já foi gravado no banco).
+    await createDraftSheet(employeeId, year, month, userId);
+    return;
+  }
 
   const grossTotal = await sumServicesForPeriod(employeeId, year, month, userId);
   const { netTotal } = calculateSheetTotals(
@@ -63,48 +110,20 @@ export async function getOrCreateSheet(
   month: number,
   userId: string,
 ) {
+  const include = {
+    employee: true,
+    history: { orderBy: { createdAt: "desc" as const }, take: 10 },
+  };
+
   let sheet = await prisma.monthlySheet.findFirst({
     where: { employeeId, year, month, userId },
-    include: {
-      employee: true,
-      history: { orderBy: { createdAt: "desc" }, take: 10 },
-    },
+    include,
   });
 
   if (!sheet) {
-    const employee = await prisma.employee.findFirst({
-      where: { id: employeeId, userId },
-    });
-    if (!employee) throw new Error("NOT_FOUND");
-
-    const grossTotal = await sumServicesForPeriod(employeeId, year, month, userId);
-    const percentage = Number(employee.defaultPercentage);
-    const { netTotal } = calculateSheetTotals(grossTotal, percentage, 0, 0, 0, 0, 0);
-
-    sheet = await prisma.monthlySheet.create({
-      data: {
-        userId,
-        employeeId,
-        year,
-        month,
-        percentage,
-        grossTotal,
-        netTotal,
-        status: "DRAFT",
-      },
-      include: {
-        employee: true,
-        history: { orderBy: { createdAt: "desc" }, take: 10 },
-      },
-    });
-
-    await prisma.monthlySheetHistory.create({
-      data: {
-        sheetId: sheet.id,
-        action: "CREATED",
-        details: { year, month },
-      },
-    });
+    const created = await createDraftSheet(employeeId, year, month, userId);
+    if (!created) throw new Error("NOT_FOUND");
+    sheet = await prisma.monthlySheet.findFirst({ where: { id: created.id }, include });
   }
 
   const services = await getSheetServices(employeeId, year, month, userId);
@@ -112,8 +131,7 @@ export async function getOrCreateSheet(
 }
 
 async function getSheetServices(employeeId: string, year: number, month: number, userId: string) {
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59);
+  const { start, end } = monthRangeUTC(year, month);
   return prisma.service.findMany({
     where: { userId, employeeId, serviceDate: { gte: start, lte: end } },
     orderBy: { serviceDate: "asc" },
@@ -125,7 +143,7 @@ export async function listSheets(params: {
   year?: number;
   month?: number;
   employeeId?: string;
-  status?: "DRAFT" | "CLOSED" | "REOPENED" | "ALL";
+  status?: "DRAFT" | "CLOSED" | "REOPENED" | "OPEN" | "ALL";
   page?: number;
   limit?: number;
 }) {
@@ -134,7 +152,11 @@ export async function listSheets(params: {
   if (year) where.year = year;
   if (month) where.month = month;
   if (employeeId) where.employeeId = employeeId;
-  if (status !== "ALL") where.status = status;
+  if (status === "OPEN") {
+    where.status = { in: ["DRAFT", "REOPENED"] };
+  } else if (status !== "ALL") {
+    where.status = status;
+  }
 
   const [items, total] = await Promise.all([
     prisma.monthlySheet.findMany({

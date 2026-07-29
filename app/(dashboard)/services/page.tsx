@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Plus, Wrench, ChevronRight } from "lucide-react";
@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmployeeQuickSearch, type EmployeeOption } from "@/components/forms/employee-quick-search";
 import { getMonthName } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -19,10 +20,16 @@ async function fetchGrouped() {
 }
 
 export default function ServicesPage() {
+  const router = useRouter();
   const { data, isLoading } = useQuery({
     queryKey: ["services-grouped"],
     queryFn: fetchGrouped,
   });
+
+  function goToEmployeeThisMonth(employee: EmployeeOption) {
+    const now = new Date();
+    router.push(`/services/${now.getFullYear()}/${now.getMonth() + 1}/${employee.id}`);
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -37,6 +44,12 @@ export default function ServicesPage() {
             </Link>
           </Button>
         }
+      />
+
+      <EmployeeQuickSearch
+        placeholder="Ir direto para um funcionário (mês atual)..."
+        onSelect={goToEmployeeThisMonth}
+        className="max-w-md"
       />
 
       {isLoading ? (

@@ -23,7 +23,9 @@ export const sheetQuerySchema = z.object({
   year: z.coerce.number().optional(),
   month: z.coerce.number().min(1).max(12).optional(),
   employeeId: z.string().optional(),
-  status: z.enum(["DRAFT", "CLOSED", "REOPENED", "ALL"]).optional().default("ALL"),
+  // "OPEN" agrupa DRAFT + REOPENED — o que ainda precisa de atenção,
+  // em oposição a CLOSED. Usado como padrão da listagem de folhas.
+  status: z.enum(["DRAFT", "CLOSED", "REOPENED", "OPEN", "ALL"]).optional().default("ALL"),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
 });

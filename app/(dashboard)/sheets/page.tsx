@@ -1,35 +1,71 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { FileSpreadsheet, ChevronRight } from "lucide-react";
+import { FileSpreadsheet, ChevronRight, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { EmployeeQuickSearch, type EmployeeOption } from "@/components/forms/employee-quick-search";
 import { getMonthName, formatCurrency } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 
-async function fetchSheets() {
-  const res = await fetch("/api/sheets?limit=50");
+type StatusFilter = "OPEN" | "CLOSED" | "ALL";
+
+interface SheetFilters {
+  year: number | null;
+  month: number | null;
+  status: StatusFilter;
+  employeeId: string | null;
+}
+
+async function fetchSheets(filters: SheetFilters) {
+  const params = new URLSearchParams({ limit: "50", status: filters.status });
+  if (filters.year) params.set("year", String(filters.year));
+  if (filters.month) params.set("month", String(filters.month));
+  if (filters.employeeId) params.set("employeeId", filters.employeeId);
+
+  const res = await fetch(`/api/sheets?${params}`);
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message);
   return json.data;
 }
 
+const now = new Date();
+const DEFAULT_FILTERS: SheetFilters = {
+  year: now.getFullYear(),
+  month: now.getMonth() + 1,
+  status: "OPEN",
+  employeeId: null,
+};
+
 function SheetsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const employeeId = searchParams.get("employeeId");
-  const year = searchParams.get("year");
-  const month = searchParams.get("month");
+  const redirectEmployeeId = searchParams.get("employeeId");
+  const redirectYear = searchParams.get("year");
+  const redirectMonth = searchParams.get("month");
 
+  const [filters, setFilters] = useState<SheetFilters>(DEFAULT_FILTERS);
+  const [employeeName, setEmployeeName] = useState<string | null>(null);
+
+  // Vindo do link "Ver folha" (Serviços ou ficha do funcionário): cria/acha
+  // a folha exata e redireciona — não passa pelos filtros manuais abaixo.
   useEffect(() => {
-    if (employeeId && year && month) {
-      fetch(`/api/sheets?employeeId=${employeeId}&year=${year}&month=${month}`)
+    if (redirectEmployeeId && redirectYear && redirectMonth) {
+      fetch(`/api/sheets?employeeId=${redirectEmployeeId}&year=${redirectYear}&month=${redirectMonth}`)
         .then((r) => r.json())
         .then((json) => {
           if (json.success && json.data?.id) {
@@ -37,11 +73,12 @@ function SheetsContent() {
           }
         });
     }
-  }, [employeeId, year, month, router]);
+  }, [redirectEmployeeId, redirectYear, redirectMonth, router]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["sheets"],
-    queryFn: fetchSheets,
+    queryKey: ["sheets", filters],
+    queryFn: () => fetchSheets(filters),
+    enabled: !redirectEmployeeId,
   });
 
   const statusLabel: Record<string, string> = {
@@ -50,12 +87,112 @@ function SheetsContent() {
     REOPENED: "Reaberta",
   };
 
+  const isDefaultFilter =
+    filters.year === DEFAULT_FILTERS.year &&
+    filters.month === DEFAULT_FILTERS.month &&
+    filters.status === "OPEN" &&
+    !filters.employeeId;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Folhas mensais"
         description="Gestão e fechamento de folhas por funcionário"
       />
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm shadow-slate-900/[0.03] sm:flex-row sm:items-center">
+        <Select
+          value={filters.month ? String(filters.month) : "ALL"}
+          onValueChange={(v) =>
+            setFilters((f) => ({ ...f, month: v === "ALL" ? null : Number(v) }))
+          }
+        >
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos os meses</SelectItem>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <SelectItem key={m} value={String(m)}>
+                {getMonthName(m)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={filters.year ? String(filters.year) : "ALL"}
+          onValueChange={(v) =>
+            setFilters((f) => ({ ...f, year: v === "ALL" ? null : Number(v) }))
+          }
+        >
+          <SelectTrigger className="w-full sm:w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos os anos</SelectItem>
+            {Array.from({ length: 6 }, (_, i) => now.getFullYear() + 1 - i).map((y) => (
+              <SelectItem key={y} value={String(y)}>
+                {y}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={filters.status}
+          onValueChange={(v) => setFilters((f) => ({ ...f, status: v as StatusFilter }))}
+        >
+          <SelectTrigger className="w-full sm:w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="OPEN">Em aberto</SelectItem>
+            <SelectItem value="CLOSED">Fechadas</SelectItem>
+            <SelectItem value="ALL">Todas</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="flex-1">
+          {employeeName ? (
+            <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-muted/40 px-3 text-sm">
+              <span className="truncate font-medium">{employeeName}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmployeeName(null);
+                  setFilters((f) => ({ ...f, employeeId: null }));
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Limpar funcionário"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <EmployeeQuickSearch
+              placeholder="Filtrar por funcionário..."
+              onSelect={(emp: EmployeeOption) => {
+                setEmployeeName(emp.name);
+                setFilters((f) => ({ ...f, employeeId: emp.id }));
+              }}
+            />
+          )}
+        </div>
+
+        {!isDefaultFilter && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setFilters(DEFAULT_FILTERS);
+              setEmployeeName(null);
+            }}
+          >
+            Limpar filtros
+          </Button>
+        )}
+      </div>
 
       {isLoading ? (
         <Skeleton className="h-64" />
@@ -101,8 +238,12 @@ function SheetsContent() {
       ) : (
         <EmptyState
           icon={FileSpreadsheet}
-          title="Nenhuma folha gerada"
-          description="As folhas são criadas automaticamente ao lançar serviços ou ao acessar o período."
+          title={isDefaultFilter ? "Nenhuma folha em aberto este mês" : "Nenhuma folha encontrada"}
+          description={
+            isDefaultFilter
+              ? "As folhas são criadas automaticamente ao lançar serviços ou ao acessar o período de um funcionário."
+              : "Tente ajustar os filtros acima."
+          }
         />
       )}
     </div>
