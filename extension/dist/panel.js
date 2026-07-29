@@ -193,10 +193,16 @@ function liloRenderLoading(message) {
   body.innerHTML = `<p class="status loading"><span class="spinner"></span>${message}</p>`;
 }
 
-function liloRenderError(message) {
+function liloRenderError(message, showRetry) {
   const body = liloBodyEl();
   if (!body) return;
-  body.innerHTML = `<p class="status error">${message}</p>`;
+  body.innerHTML = `
+    <p class="status error">${message}</p>
+    ${showRetry ? '<button type="button" class="btn primary retry">Tentar novamente</button>' : ""}
+  `;
+  if (showRetry) {
+    body.querySelector(".retry")?.addEventListener("click", liloRunCapture);
+  }
 }
 
 function liloFieldRowsHtml(data) {
@@ -240,7 +246,37 @@ function liloSetStatus(message, type) {
   el.textContent = message;
 }
 
+// O portal (Salesforce Lightning) ainda busca e renderiza os dados do
+// registro via chamadas assíncronas depois que a página já está
+// "pronta" — capturar de primeira costuma vir vazio. Em vez de desistir
+// na primeira tentativa, insiste por alguns segundos.
+const LILO_CAPTURE_RETRY_INTERVAL_MS = 800;
+const LILO_CAPTURE_MAX_ATTEMPTS = 15; // ~12s de tentativas no total
+
+let liloCaptureGeneration = 0;
+
+function liloSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function liloWaitForExtraction(myGeneration) {
+  for (let attempt = 0; attempt < LILO_CAPTURE_MAX_ATTEMPTS; attempt++) {
+    if (myGeneration !== liloCaptureGeneration) return null;
+    let data;
+    try {
+      data = extractAll();
+    } catch {
+      data = null;
+    }
+    if (data?.serviceNumber?.value) return data;
+    await liloSleep(LILO_CAPTURE_RETRY_INTERVAL_MS);
+  }
+  return null;
+}
+
 async function liloRunCapture() {
+  const myGeneration = ++liloCaptureGeneration;
+
   const { token, apiUrl } = await liloGetAuth();
   liloToken = token;
   liloApiUrl = apiUrl;
@@ -252,19 +288,17 @@ async function liloRunCapture() {
 
   liloRenderLoading("Capturando dados da página...");
 
-  let data;
-  try {
-    data = extractAll();
-  } catch {
-    liloRenderError("Não foi possível ler os dados desta página.");
+  const data = await liloWaitForExtraction(myGeneration);
+  if (myGeneration !== liloCaptureGeneration) return; // usuário já navegou para outra página
+
+  if (!data) {
+    liloRenderError(
+      "Não encontrei os dados do serviço nesta página. A página pode ainda estar carregando.",
+      true,
+    );
     return;
   }
   liloExtracted = data;
-
-  if (!data?.serviceNumber?.value) {
-    liloRenderError("Não encontrei os dados do serviço nesta página.");
-    return;
-  }
 
   try {
     const res = await fetch(`${apiUrl}/api/employees?status=ACTIVE&limit=100`, {
@@ -276,9 +310,12 @@ async function liloRunCapture() {
     liloEmployees = [];
   }
 
+  if (myGeneration !== liloCaptureGeneration) return; // usuário já navegou para outra página
+
   liloRenderCaptured();
 
   const employee = await getOrCreateEmployee(apiUrl, token, data);
+  if (myGeneration !== liloCaptureGeneration) return; // usuário já navegou para outra página
   if (employee) {
     if (!liloEmployees.some((e) => e.id === employee.id)) {
       liloEmployees.unshift(employee);
