@@ -7,6 +7,8 @@ declare module "next-auth" {
       email?: string | null;
       name?: string | null;
     };
+    /** Unix timestamp (seconds) the underlying JWT was issued at. */
+    iat?: number;
   }
 }
 

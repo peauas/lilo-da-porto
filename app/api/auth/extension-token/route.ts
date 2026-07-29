@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth";
-import { createExtensionToken } from "@/lib/auth-helpers";
+import { createExtensionToken, checkRateLimit, requireApiAuth } from "@/lib/auth-helpers";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { loginSchema } from "@/schemas/auth.schema";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +11,9 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return apiError("VALIDATION_ERROR", "Dados inválidos", 400, parsed.error.flatten());
     }
+
+    const rateLimited = await checkRateLimit(request, `extension-login:${parsed.data.email}`, 10, 15 * 60 * 1000);
+    if (rateLimited) return rateLimited;
 
     const user = await prisma.user.findUnique({
       where: { email: parsed.data.email },
@@ -36,11 +38,18 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
+export async function GET(request: Request) {
+  const authUser = await requireApiAuth(request);
+  if (!authUser) {
     return apiError("UNAUTHORIZED", "Não autorizado", 401);
   }
-  const token = await createExtensionToken(session.user.id);
-  return apiSuccess({ token, user: session.user });
+  const user = await prisma.user.findUnique({
+    where: { id: authUser.userId },
+    select: { id: true, email: true, name: true },
+  });
+  if (!user) {
+    return apiError("UNAUTHORIZED", "Não autorizado", 401);
+  }
+  const token = await createExtensionToken(user.id);
+  return apiSuccess({ token, user });
 }

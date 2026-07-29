@@ -35,17 +35,18 @@ enum SheetStatus {
 }
 
 model User {
-  id            String               @id @default(cuid())
-  email         String               @unique
-  name          String
-  passwordHash  String
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  resetTokens   PasswordResetToken[]
-  employees     Employee[]
-  services      Service[]
-  monthlySheets MonthlySheet[]
-  documents     EmployeeDocument[]
+  id                String               @id @default(cuid())
+  email             String               @unique
+  name              String
+  passwordHash      String
+  passwordChangedAt DateTime             @default(now())
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  resetTokens       PasswordResetToken[]
+  employees         Employee[]
+  services          Service[]
+  monthlySheets     MonthlySheet[]
+  documents         EmployeeDocument[]
 }
 
 model PasswordResetToken {
