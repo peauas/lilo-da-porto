@@ -23,7 +23,7 @@ const smtpTransport =
 const smtpFrom = `${process.env.SMTP_FROM_NAME ?? "Lilo da Porto"} <${process.env.SMTP_USER}>`;
 
 function passwordResetHtml(resetUrl: string): string {
-  const logoUrl = `${getAppUrl()}/logo-mark.png`;
+  const logoUrl = `${getAppUrl()}/logo-lockup.png`;
   const fontStack =
     "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
@@ -41,7 +41,7 @@ function passwordResetHtml(resetUrl: string): string {
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%; background-color:#ffffff; border-radius:16px; border:1px solid #e6eaf1; overflow:hidden;">
             <tr>
               <td align="center" style="padding:40px 40px 8px 40px;">
-                <img src="${logoUrl}" width="56" height="56" alt="Lilo da Porto" style="display:block; border-radius:14px;" />
+                <img src="${logoUrl}" width="141" height="52" alt="Lilo da Porto" style="display:block;" />
               </td>
             </tr>
             <tr>
