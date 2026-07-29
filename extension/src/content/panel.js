@@ -14,9 +14,6 @@ const LILO_DETAIL_URL_RE = /\/workorder\/[^/]+\/detail(?:[/?#]|$)/i;
 
 const LILO_PANEL_CSS = `
   .panel {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
     width: 320px;
     max-height: 80vh;
     overflow-y: auto;
@@ -147,7 +144,14 @@ function liloEnsureHost() {
   if (liloHostEl) return;
   liloHostEl = document.createElement("div");
   liloHostEl.id = LILO_PANEL_HOST_ID;
-  liloHostEl.style.all = "initial";
+  // "popover" promove o elemento para o "top layer" do navegador — uma
+  // camada acima de toda a página, imune a z-index/stacking context de
+  // terceiros (o portal tem componentes com stacking próprio que
+  // ficavam na frente do painel quando ele só usava z-index alto).
+  // "manual" evita o fechamento automático ao clicar fora (light-dismiss).
+  liloHostEl.setAttribute("popover", "manual");
+  liloHostEl.style.cssText =
+    "all: initial; position: fixed; inset: auto 20px 20px auto; margin: 0; padding: 0; border: none; background: transparent;";
   document.documentElement.appendChild(liloHostEl);
   liloShadowRoot = liloHostEl.attachShadow({ mode: "open" });
   liloShadowRoot.innerHTML = `
@@ -162,10 +166,24 @@ function liloEnsureHost() {
     </div>
   `;
   liloShadowRoot.querySelector(".close").addEventListener("click", liloDismissPanel);
+  if (typeof liloHostEl.showPopover === "function") {
+    try {
+      liloHostEl.showPopover();
+    } catch (err) {
+      console.warn("[Lilo da Porto] showPopover falhou:", err);
+    }
+  }
 }
 
 function liloRemoveHost() {
   if (liloHostEl) {
+    if (typeof liloHostEl.hidePopover === "function") {
+      try {
+        liloHostEl.hidePopover();
+      } catch {
+        // já estava escondido/fechado — ignora.
+      }
+    }
     liloHostEl.remove();
     liloHostEl = null;
     liloShadowRoot = null;
