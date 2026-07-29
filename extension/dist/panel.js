@@ -176,6 +176,7 @@ function liloEnsureHost() {
 }
 
 function liloRemoveHost() {
+  liloStopWatchingForChanges();
   if (liloHostEl) {
     if (typeof liloHostEl.hidePopover === "function") {
       try {
@@ -188,6 +189,58 @@ function liloRemoveHost() {
     liloHostEl = null;
     liloShadowRoot = null;
   }
+}
+
+// O prestador pode adicionar custo complementar (ex: KM excedente,
+// alteração de endereço) a qualquer momento, na mesma página, sem
+// trocar de URL — a detecção de navegação (pushState/polling) não pega
+// isso. Observa mudanças no DOM e recaptura os valores quando param de
+// mudar por um instante, sem mexer na seleção de funcionário já feita.
+let liloMutationObserver = null;
+let liloMutationDebounceTimer = null;
+const LILO_MUTATION_DEBOUNCE_MS = 1200;
+
+function liloStartWatchingForChanges() {
+  liloStopWatchingForChanges();
+  liloMutationObserver = new MutationObserver(() => {
+    clearTimeout(liloMutationDebounceTimer);
+    liloMutationDebounceTimer = setTimeout(liloRecaptureIfChanged, LILO_MUTATION_DEBOUNCE_MS);
+  });
+  liloMutationObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+}
+
+function liloStopWatchingForChanges() {
+  liloMutationObserver?.disconnect();
+  liloMutationObserver = null;
+  clearTimeout(liloMutationDebounceTimer);
+}
+
+async function liloRecaptureIfChanged() {
+  // Só atualiza se o painel já estiver com dados capturados exibidos —
+  // não interfere nos estados de carregamento/login/erro.
+  if (!liloHostEl || !liloExtracted || !liloIsDetailPage()) return;
+
+  let fresh;
+  try {
+    fresh = extractAll();
+  } catch {
+    return;
+  }
+  if (!fresh?.serviceNumber?.value) return;
+
+  const valuesChanged =
+    fresh.totalValue.value !== liloExtracted.totalValue.value ||
+    fresh.additionalValue.value !== liloExtracted.additionalValue.value ||
+    fresh.baseValue.value !== liloExtracted.baseValue.value;
+  if (!valuesChanged) return;
+
+  liloExtracted = fresh;
+  const fieldsEl = liloBodyEl()?.querySelector(".fields");
+  if (fieldsEl) fieldsEl.innerHTML = liloFieldRowsHtml(liloExtracted);
 }
 
 function liloDismissPanel() {
@@ -331,6 +384,7 @@ async function liloRunCapture() {
   if (myGeneration !== liloCaptureGeneration) return; // usuário já navegou para outra página
 
   liloRenderCaptured();
+  liloStartWatchingForChanges();
 
   const employee = await getOrCreateEmployee(apiUrl, token, data);
   if (myGeneration !== liloCaptureGeneration) return; // usuário já navegou para outra página
