@@ -1,0 +1,420 @@
+/**
+ * Painel flutuante injetado automaticamente na página de detalhe do
+ * serviço (Salesforce Experience Cloud, my.site.com), para não depender
+ * de o usuário clicar no ícone da extensão.
+ *
+ * Detecção de navegação: o portal é uma SPA (troca de registro não
+ * recarrega a página), então além de popstate/pushState/replaceState
+ * também fazemos um polling leve como rede de segurança, já que não
+ * sabemos ao certo qual mecanismo de roteamento o portal usa por baixo.
+ */
+
+const LILO_PANEL_HOST_ID = "lilo-da-porto-panel-host";
+const LILO_DETAIL_URL_RE = /\/workorder\/[^/]+\/detail(?:[/?#]|$)/i;
+
+const LILO_PANEL_CSS = `
+  .panel {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 320px;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.18), 0 1px 2px rgba(15, 23, 42, 0.08);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+  }
+  .header img { width: 24px; height: 24px; border-radius: 6px; display: block; }
+  .header span { flex: 1; }
+  .close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    color: #64748b;
+    padding: 2px 6px;
+  }
+  .close:hover { color: #0f172a; }
+  .body { padding: 14px; }
+  .fields {
+    border: 1px solid #eef1f4;
+    border-radius: 8px;
+    padding: 2px 10px;
+    margin-bottom: 12px;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid #eef1f4;
+  }
+  .row:last-child { border-bottom: none; }
+  .row span:first-child { color: #64748b; }
+  .row span:last-child { font-weight: 600; text-align: right; }
+  .row.total span:last-child { color: #0b2d6b; font-size: 14px; }
+  .low { color: #d97706 !important; font-weight: 600; }
+  label { display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px; }
+  select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 8px;
+    font-family: inherit;
+    color: #0f172a;
+    background: #fafbfc;
+    box-sizing: border-box;
+  }
+  .hint {
+    font-size: 12px;
+    color: #059669;
+    background: #ecfdf5;
+    border: 1px solid rgba(5, 150, 105, 0.2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+  }
+  .hint.hidden { display: none; }
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .btn.primary { background: #00aaf6; color: white; }
+  .btn.primary:hover { background: #0089cb; }
+  .status { margin-top: 8px; font-size: 12px; text-align: center; color: #64748b; }
+  .status.error { color: #dc2626; }
+  .status.success { color: #059669; font-weight: 600; }
+  .status.loading { color: #64748b; }
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #00aaf6;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: lilo-spin 0.7s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes lilo-spin { to { transform: rotate(360deg); } }
+`;
+
+let liloHostEl = null;
+let liloShadowRoot = null;
+let liloToken = null;
+let liloApiUrl = null;
+let liloEmployees = [];
+let liloExtracted = null;
+let liloDuplicate = null;
+const liloDismissedUrls = new Set();
+let liloLastUrl = location.href;
+
+function liloIsDetailPage() {
+  return LILO_DETAIL_URL_RE.test(location.pathname);
+}
+
+async function liloGetAuth() {
+  const stored = await chrome.storage.local.get(["token", "apiUrl"]);
+  return {
+    token: stored.token || null,
+    apiUrl: stored.apiUrl || LILO_CONFIG.PRODUCTION_API_URL,
+  };
+}
+
+function liloEnsureHost() {
+  if (liloHostEl) return;
+  liloHostEl = document.createElement("div");
+  liloHostEl.id = LILO_PANEL_HOST_ID;
+  liloHostEl.style.all = "initial";
+  document.documentElement.appendChild(liloHostEl);
+  liloShadowRoot = liloHostEl.attachShadow({ mode: "open" });
+  liloShadowRoot.innerHTML = `
+    <style>${LILO_PANEL_CSS}</style>
+    <div class="panel">
+      <div class="header">
+        <img src="${chrome.runtime.getURL("icons/icon-32.png")}" alt="" />
+        <span>Lilo da Porto</span>
+        <button type="button" class="close" aria-label="Fechar">×</button>
+      </div>
+      <div class="body"></div>
+    </div>
+  `;
+  liloShadowRoot.querySelector(".close").addEventListener("click", liloDismissPanel);
+}
+
+function liloRemoveHost() {
+  if (liloHostEl) {
+    liloHostEl.remove();
+    liloHostEl = null;
+    liloShadowRoot = null;
+  }
+}
+
+function liloDismissPanel() {
+  liloDismissedUrls.add(location.href);
+  liloRemoveHost();
+}
+
+function liloBodyEl() {
+  return liloShadowRoot?.querySelector(".body");
+}
+
+function liloRenderLoggedOut() {
+  const body = liloBodyEl();
+  if (!body) return;
+  body.innerHTML = `<p class="hint" style="color:#64748b;background:#f1f5f9;border-color:#e2e8f0;">Faça login na extensão (clique no ícone ao lado da barra de endereço) para habilitar a captura automática.</p>`;
+}
+
+function liloRenderLoading(message) {
+  const body = liloBodyEl();
+  if (!body) return;
+  body.innerHTML = `<p class="status loading"><span class="spinner"></span>${message}</p>`;
+}
+
+function liloRenderError(message) {
+  const body = liloBodyEl();
+  if (!body) return;
+  body.innerHTML = `<p class="status error">${message}</p>`;
+}
+
+function liloFieldRowsHtml(data) {
+  return Object.entries(data)
+    .filter(([key]) => key !== "qru" && key !== "_meta")
+    .filter(
+      ([key, field]) =>
+        field?.value || ["baseValue", "additionalValue", "totalValue"].includes(key),
+    )
+    .map(([key, field]) => {
+      const label = FIELD_LABELS[key] || key;
+      const lowConf = field.confidence < 0.6;
+      const value = formatFieldValue(key, field.value);
+      return `<div class="row${key === "totalValue" ? " total" : ""}"><span>${label}</span><span class="${lowConf ? "low" : ""}">${value}${lowConf ? " ⚠" : ""}</span></div>`;
+    })
+    .join("");
+}
+
+function liloRenderCaptured() {
+  const body = liloBodyEl();
+  if (!body) return;
+  const options = liloEmployees.map((e) => `<option value="${e.id}">${e.name}</option>`).join("");
+  body.innerHTML = `
+    <div class="fields">${liloFieldRowsHtml(liloExtracted)}</div>
+    <label>Funcionário</label>
+    <select class="employee"><option value="">Selecione...</option>${options}</select>
+    <p class="hint employee-hint hidden"></p>
+    <button type="button" class="btn primary submit">Enviar serviço</button>
+    <p class="status"></p>
+  `;
+  body.querySelector(".submit").addEventListener("click", liloSubmitService);
+  body.querySelector(".employee").addEventListener("change", () => {
+    body.querySelector(".employee-hint")?.classList.add("hidden");
+  });
+}
+
+function liloSetStatus(message, type) {
+  const el = liloBodyEl()?.querySelector(".status");
+  if (!el) return;
+  el.className = `status ${type || ""}`;
+  el.textContent = message;
+}
+
+async function liloRunCapture() {
+  const { token, apiUrl } = await liloGetAuth();
+  liloToken = token;
+  liloApiUrl = apiUrl;
+
+  if (!token) {
+    liloRenderLoggedOut();
+    return;
+  }
+
+  liloRenderLoading("Capturando dados da página...");
+
+  let data;
+  try {
+    data = extractAll();
+  } catch {
+    liloRenderError("Não foi possível ler os dados desta página.");
+    return;
+  }
+  liloExtracted = data;
+
+  if (!data?.serviceNumber?.value) {
+    liloRenderError("Não encontrei os dados do serviço nesta página.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${apiUrl}/api/employees?status=ACTIVE&limit=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = await res.json();
+    liloEmployees = json.data ?? [];
+  } catch {
+    liloEmployees = [];
+  }
+
+  liloRenderCaptured();
+
+  const employee = await getOrCreateEmployee(apiUrl, token, data);
+  if (employee) {
+    if (!liloEmployees.some((e) => e.id === employee.id)) {
+      liloEmployees.unshift(employee);
+      liloRenderCaptured();
+    }
+    const body = liloBodyEl();
+    const select = body?.querySelector(".employee");
+    if (select) select.value = employee.id;
+    const hint = body?.querySelector(".employee-hint");
+    if (hint) {
+      hint.textContent = `Detectado automaticamente: ${employee.name}`;
+      hint.classList.remove("hidden");
+    }
+  }
+}
+
+async function liloSubmitService() {
+  const body = liloBodyEl();
+  const select = body?.querySelector(".employee");
+  const employeeId = select?.value;
+  if (!employeeId) {
+    liloSetStatus("Selecione um funcionário", "error");
+    return;
+  }
+  if (!liloExtracted?.serviceNumber?.value) {
+    liloSetStatus("Capture os dados primeiro", "error");
+    return;
+  }
+
+  const employeeName = select.selectedOptions[0]?.textContent || "";
+  const payload = {
+    employeeId,
+    serviceNumber: String(liloExtracted.serviceNumber.value).trim(),
+    serviceDate: liloExtracted.serviceDate.value,
+    baseValue: Number(liloExtracted.baseValue.value) || 0,
+    additionalValue: Number(liloExtracted.additionalValue.value) || 0,
+    origin: "EXTENSION",
+  };
+
+  liloSetStatus("Enviando...", "loading");
+
+  try {
+    const res = await fetch(`${liloApiUrl}/api/services`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${liloToken}` },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+
+    if (res.status === 409) {
+      liloDuplicate = json.error.details;
+      const confirmed = confirm(
+        `Serviço ${liloDuplicate.serviceNumber} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`,
+      );
+      if (confirmed) {
+        await liloUpdateService(payload, employeeName);
+      } else {
+        liloSetStatus("Envio cancelado", "");
+      }
+      return;
+    }
+
+    if (!json.success) {
+      liloSetStatus(json.error?.message || "Erro ao enviar", "error");
+      return;
+    }
+
+    liloOnSubmitSuccess(payload.serviceNumber, employeeName, false);
+  } catch {
+    liloSetStatus("Erro de conexão", "error");
+  }
+}
+
+async function liloUpdateService(payload, employeeName) {
+  try {
+    const res = await fetch(`${liloApiUrl}/api/services/${liloDuplicate.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${liloToken}` },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (json.success) {
+      liloOnSubmitSuccess(payload.serviceNumber, employeeName, true);
+    } else {
+      liloSetStatus(json.error?.message || "Erro ao atualizar", "error");
+    }
+  } catch {
+    liloSetStatus("Erro de conexão", "error");
+  }
+}
+
+function liloOnSubmitSuccess(serviceNumber, employeeName, updated) {
+  liloSetStatus(
+    `Serviço ${serviceNumber} ${updated ? "atualizado" : "enviado"} para ${employeeName}!`,
+    "success",
+  );
+  liloDismissedUrls.add(location.href);
+  setTimeout(liloRemoveHost, 2500);
+}
+
+async function liloOnUrlChange() {
+  if (!liloIsDetailPage()) {
+    liloRemoveHost();
+    return;
+  }
+  if (liloDismissedUrls.has(location.href)) return;
+  liloEnsureHost();
+  await liloRunCapture();
+}
+
+function liloHandleNavigationChange() {
+  if (location.href === liloLastUrl) return;
+  liloLastUrl = location.href;
+  liloOnUrlChange();
+}
+
+const liloOrigPushState = history.pushState;
+history.pushState = function (...args) {
+  liloOrigPushState.apply(this, args);
+  liloHandleNavigationChange();
+};
+const liloOrigReplaceState = history.replaceState;
+history.replaceState = function (...args) {
+  liloOrigReplaceState.apply(this, args);
+  liloHandleNavigationChange();
+};
+window.addEventListener("popstate", liloHandleNavigationChange);
+// Rede de segurança: se o portal navegar sem passar por pushState/
+// replaceState (ex: algum roteador interno do Lightning), o polling
+// ainda pega a troca de URL.
+setInterval(liloHandleNavigationChange, 800);
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.token && liloHostEl) {
+    liloOnUrlChange();
+  }
+});
+
+liloOnUrlChange();
