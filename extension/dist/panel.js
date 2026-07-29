@@ -33,7 +33,7 @@ const LILO_PANEL_CSS = `
     border-bottom: 1px solid #e5e7eb;
     font-weight: 600;
   }
-  .header img { width: 24px; height: 24px; border-radius: 6px; display: block; }
+  .header img { height: 22px; width: auto; display: block; }
   .header span { flex: 1; }
   .close {
     background: none;
@@ -158,8 +158,8 @@ function liloEnsureHost() {
     <style>${LILO_PANEL_CSS}</style>
     <div class="panel">
       <div class="header">
-        <img src="${chrome.runtime.getURL("icons/icon-32.png")}" alt="" />
-        <span>Lilo da Porto</span>
+        <img src="${chrome.runtime.getURL("icons/logo.png")}" alt="Lilo da Porto" />
+        <span></span>
         <button type="button" class="close" aria-label="Fechar">×</button>
       </div>
       <div class="body"></div>

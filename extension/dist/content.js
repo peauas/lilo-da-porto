@@ -22,8 +22,8 @@ const FIELD_KEYWORDS = {
     "nome do tecnico",
   ],
   cpf: ["cpf", "c.p.f", "cadastro", "documento"],
-  baseValue: ["valor base", "valor serviço", "valor do serviço", "custos da ordem"],
-  additionalValue: ["adicional", "valor adicional", "extra"],
+  baseValue: ["valor base", "valor serviço", "valor do serviço", "custos da ordem", "valor inicial"],
+  additionalValue: ["adicional", "valor adicional", "extra", "valor complementar"],
   totalValue: ["valor total", "total geral", "custos da ordem de serviço", "total"],
   attendanceDate: ["data de atendimento", "data atendimento", "data do atendimento"],
   serviceDate: [
@@ -64,6 +64,37 @@ function findByMultilineLabel(text, keywords) {
     .map((l) => l.trim())
     .filter(Boolean);
   for (let i = 0; i < lines.length - 1; i++) {
+    const line = stripAccents(lines[i].toLowerCase());
+    if (normKeywords.some((k) => line === k || line.startsWith(k + " ") || line.includes(k))) {
+      const next = lines[i + 1];
+      if (
+        next &&
+        next.length < 300 &&
+        !normKeywords.some((k) => stripAccents(next.toLowerCase()).includes(k))
+      ) {
+        return next;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Como findByMultilineLabel, mas a partir da ÚLTIMA ocorrência do
+ * rótulo no texto. Necessário para "Valor Total": esse rótulo também
+ * aparece como cabeçalho de coluna na tabela de custos, mais acima na
+ * página — o resumo "Valor Inicial + Valor Complementar = Valor Total"
+ * (que só existe quando o prestador lança custo extra depois da
+ * análise, ex: KM excedente) fica mais abaixo, então é a última
+ * ocorrência que interessa.
+ */
+function findLastByMultilineLabel(text, keywords) {
+  const normKeywords = keywords.map((k) => stripAccents(k.toLowerCase()));
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  for (let i = lines.length - 2; i >= 0; i--) {
     const line = stripAccents(lines[i].toLowerCase());
     if (normKeywords.some((k) => line === k || line.startsWith(k + " ") || line.includes(k))) {
       const next = lines[i + 1];
@@ -321,11 +352,28 @@ function extractValues(text) {
   let totalValue = null;
   let confidence = 0.3;
 
-  const custosLine = findByMultilineLabel(text, ["custos da ordem de serviço", "custos da ordem"]);
-  if (custosLine) {
-    totalValue = parseMoney(custosLine);
-    baseValue = totalValue;
+  // Resumo "Valor Inicial + Valor Complementar = Valor Total": só existe
+  // quando o prestador lança um custo extra depois da análise inicial
+  // (ex: KM excedente). Prioridade máxima porque reflete o total real
+  // a receber, não só o valor inicial já analisado.
+  const valorTotalResumo = findLastByMultilineLabel(text, ["valor total"]);
+  const parsedTotalResumo = valorTotalResumo ? parseMoney(valorTotalResumo) : null;
+  if (parsedTotalResumo !== null) {
+    const valorInicial = findLastByMultilineLabel(text, ["valor inicial"]);
+    const parsedInicial = valorInicial ? parseMoney(valorInicial) : null;
+    baseValue = parsedInicial ?? parsedTotalResumo;
+    totalValue = parsedTotalResumo;
+    additionalValue = Math.max(0, totalValue - baseValue);
     confidence = 0.95;
+  }
+
+  if (!totalValue) {
+    const custosLine = findByMultilineLabel(text, ["custos da ordem de serviço", "custos da ordem"]);
+    if (custosLine) {
+      totalValue = parseMoney(custosLine);
+      baseValue = totalValue;
+      confidence = 0.95;
+    }
   }
 
   if (!totalValue) {
@@ -348,10 +396,12 @@ function extractValues(text) {
     }
   }
 
-  const addLabel = findByLabel(FIELD_KEYWORDS.additionalValue);
-  if (addLabel) {
-    additionalValue = parseMoney(addLabel) ?? 0;
-    if (baseValue) totalValue = baseValue + additionalValue;
+  if (parsedTotalResumo === null) {
+    const addLabel = findByLabel(FIELD_KEYWORDS.additionalValue);
+    if (addLabel) {
+      additionalValue = parseMoney(addLabel) ?? 0;
+      if (baseValue) totalValue = baseValue + additionalValue;
+    }
   }
 
   return {
