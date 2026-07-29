@@ -428,11 +428,10 @@ async function liloRunCapture() {
   liloExtracted = data;
 
   try {
-    const res = await fetch(`${apiUrl}/api/employees?status=ACTIVE&limit=100`, {
+    const response = await apiFetchViaBackground(`${apiUrl}/api/employees?status=ACTIVE&limit=100`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const json = await res.json();
-    liloEmployees = json.data ?? [];
+    liloEmployees = response?.ok && response.body?.success ? (response.body.data ?? []) : [];
   } catch {
     liloEmployees = [];
   }
@@ -530,17 +529,16 @@ async function liloSubmitService() {
   liloSetStatus("Enviando...", "loading");
 
   try {
-    const res = await fetch(`${liloApiUrl}/api/services`, {
+    const response = await apiFetchViaBackground(`${liloApiUrl}/api/services`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${liloToken}` },
       body: JSON.stringify(payload),
     });
-    const json = await res.json();
 
-    if (res.status === 409) {
-      liloDuplicate = json.error.details;
+    if (response?.status === 409) {
+      liloDuplicate = response.body?.error?.details;
       const confirmed = confirm(
-        `Serviço ${liloDuplicate.serviceNumber} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`,
+        `Serviço ${liloDuplicate?.serviceNumber} já existe para este funcionário.\n\nDeseja ATUALIZAR o serviço existente?\n\nClique OK para atualizar ou Cancelar para abortar.`,
       );
       if (confirmed) {
         await liloUpdateService(payload, employeeName);
@@ -550,8 +548,8 @@ async function liloSubmitService() {
       return;
     }
 
-    if (!json.success) {
-      liloSetStatus(json.error?.message || "Erro ao enviar", "error");
+    if (!response?.body?.success) {
+      liloSetStatus(response?.body?.error?.message || "Erro ao enviar", "error");
       return;
     }
 
@@ -563,16 +561,15 @@ async function liloSubmitService() {
 
 async function liloUpdateService(payload, employeeName) {
   try {
-    const res = await fetch(`${liloApiUrl}/api/services/${liloDuplicate.id}`, {
+    const response = await apiFetchViaBackground(`${liloApiUrl}/api/services/${liloDuplicate.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${liloToken}` },
       body: JSON.stringify(payload),
     });
-    const json = await res.json();
-    if (json.success) {
+    if (response?.body?.success) {
       liloOnSubmitSuccess(payload.serviceNumber, employeeName, true);
     } else {
-      liloSetStatus(json.error?.message || "Erro ao atualizar", "error");
+      liloSetStatus(response?.body?.error?.message || "Erro ao atualizar", "error");
     }
   } catch {
     liloSetStatus("Erro de conexão", "error");
