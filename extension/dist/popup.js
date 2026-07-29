@@ -227,9 +227,14 @@ let duplicateService = null;
 async function init() {
   const stored = await chrome.storage.local.get(["token", "apiUrl", "email"]);
   token = stored.token;
-  apiUrl = stored.apiUrl || "http://localhost:3000";
+  apiUrl = stored.apiUrl || LILO_CONFIG.PRODUCTION_API_URL;
 
   document.getElementById("api-url").value = apiUrl;
+  // Só mostra o campo de URL se alguém já tiver apontado para um servidor
+  // diferente do de produção (ex: desenvolvimento local).
+  if (apiUrl !== LILO_CONFIG.PRODUCTION_API_URL) {
+    document.getElementById("advanced-section").classList.remove("hidden");
+  }
   if (stored.email) document.getElementById("email").value = stored.email;
 
   if (token) {
@@ -238,6 +243,10 @@ async function init() {
     showLogin();
   }
 }
+
+document.getElementById("toggle-advanced").addEventListener("click", () => {
+  document.getElementById("advanced-section").classList.toggle("hidden");
+});
 
 function showLogin() {
   document.getElementById("loading").classList.add("hidden");
@@ -256,7 +265,8 @@ async function showMain() {
 document.getElementById("login-btn").addEventListener("click", async () => {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
-  apiUrl = document.getElementById("api-url").value.replace(/\/$/, "");
+  const apiUrlValue = document.getElementById("api-url").value.trim() || LILO_CONFIG.PRODUCTION_API_URL;
+  apiUrl = apiUrlValue.replace(/\/$/, "");
   const errorEl = document.getElementById("login-error");
 
   try {
