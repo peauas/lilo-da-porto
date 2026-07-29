@@ -112,32 +112,34 @@ async function getOrCreateEmployee(apiUrl, token, extracted) {
   const cpf = normalizeCpf(extracted.employeeCpf?.value);
   if (!name) return null;
 
-  let employee = null;
-  if (cpf.length === 11) {
-    const byCpf = await searchEmployees(apiUrl, token, cpf);
-    employee = findExactEmployeeMatch(byCpf, name, cpf);
-    if (employee) return employee;
-  }
-
   // A busca da API é por substring, então mandar o nome inteiro capturado
   // (ex: "PAULO CESAR DIAS") raramente casa com o nome cadastrado (ex:
   // "Paulo Dias"). Buscar pelo primeiro e pelo último nome separadamente
-  // encontra o candidato certo mesmo com nomes do meio diferentes.
+  // (além do nome completo e do CPF) encontra o candidato certo mesmo com
+  // nomes do meio diferentes. As buscas rodam em paralelo — em sequência,
+  // em rede real (não localhost), a soma das 3-4 chamadas podia levar
+  // alguns segundos para o funcionário aparecer selecionado.
   const tokens = firstAndLastTokens(name);
+  const searches = [searchEmployees(apiUrl, token, name)];
+  if (cpf.length === 11) searches.push(searchEmployees(apiUrl, token, cpf));
   if (tokens) {
-    const byFirstName = await searchEmployees(apiUrl, token, tokens.first);
-    employee = findExactEmployeeMatch(byFirstName, name, cpf);
-    if (employee) return employee;
+    searches.push(searchEmployees(apiUrl, token, tokens.first));
+    if (tokens.last !== tokens.first) searches.push(searchEmployees(apiUrl, token, tokens.last));
+  }
 
-    if (tokens.last !== tokens.first) {
-      const byLastName = await searchEmployees(apiUrl, token, tokens.last);
-      employee = findExactEmployeeMatch(byLastName, name, cpf);
-      if (employee) return employee;
+  const results = await Promise.all(searches);
+  const seenIds = new Set();
+  const combined = [];
+  for (const list of results) {
+    for (const emp of list) {
+      if (!seenIds.has(emp.id)) {
+        seenIds.add(emp.id);
+        combined.push(emp);
+      }
     }
   }
 
-  const byName = await searchEmployees(apiUrl, token, name);
-  employee = findExactEmployeeMatch(byName, name, cpf);
+  const employee = findExactEmployeeMatch(combined, name, cpf);
   if (employee) return employee;
 
   if (cpf.length < 11) return null;

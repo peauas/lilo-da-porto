@@ -32,6 +32,9 @@ const LILO_PANEL_CSS = `
     padding: 12px 14px;
     border-bottom: 1px solid #e5e7eb;
     font-weight: 600;
+    cursor: move;
+    touch-action: none;
+    user-select: none;
   }
   .header img { height: 22px; width: auto; display: block; }
   .header span { flex: 1; }
@@ -150,8 +153,10 @@ function liloEnsureHost() {
   // ficavam na frente do painel quando ele só usava z-index alto).
   // "manual" evita o fechamento automático ao clicar fora (light-dismiss).
   liloHostEl.setAttribute("popover", "manual");
+  // Abre no topo (não embaixo) pra não cobrir botões de ação que o
+  // portal costuma colocar no rodapé da página (ex: "Enviar Serviço").
   liloHostEl.style.cssText =
-    "all: initial; position: fixed; inset: auto 20px 20px auto; margin: 0; padding: 0; border: none; background: transparent;";
+    "all: initial; position: fixed; inset: 20px 20px auto auto; margin: 0; padding: 0; border: none; background: transparent;";
   document.documentElement.appendChild(liloHostEl);
   liloShadowRoot = liloHostEl.attachShadow({ mode: "open" });
   liloShadowRoot.innerHTML = `
@@ -166,6 +171,7 @@ function liloEnsureHost() {
     </div>
   `;
   liloShadowRoot.querySelector(".close").addEventListener("click", liloDismissPanel);
+  liloMakeDraggable(liloHostEl, liloShadowRoot.querySelector(".header"));
   if (typeof liloHostEl.showPopover === "function") {
     try {
       liloHostEl.showPopover();
@@ -173,6 +179,56 @@ function liloEnsureHost() {
       console.warn("[Lilo da Porto] showPopover falhou:", err);
     }
   }
+}
+
+// Deixa o usuário arrastar o painel pelo cabeçalho, caso a posição
+// padrão fique sobre algo importante da página.
+function liloMakeDraggable(hostEl, handleEl) {
+  if (!handleEl) return;
+  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  let startTop = 0;
+  let startLeft = 0;
+
+  handleEl.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".close")) return;
+    const rect = hostEl.getBoundingClientRect();
+    dragging = true;
+    startX = event.clientX;
+    startY = event.clientY;
+    startTop = rect.top;
+    startLeft = rect.left;
+    hostEl.style.top = `${startTop}px`;
+    hostEl.style.left = `${startLeft}px`;
+    hostEl.style.right = "auto";
+    hostEl.style.bottom = "auto";
+    handleEl.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  handleEl.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    const maxTop = window.innerHeight - 40;
+    const maxLeft = window.innerWidth - 40;
+    const newTop = Math.min(Math.max(0, startTop + (event.clientY - startY)), maxTop);
+    const newLeft = Math.min(Math.max(0, startLeft + (event.clientX - startX)), maxLeft);
+    hostEl.style.top = `${newTop}px`;
+    hostEl.style.left = `${newLeft}px`;
+  });
+
+  function stopDragging(event) {
+    if (!dragging) return;
+    dragging = false;
+    try {
+      handleEl.releasePointerCapture(event.pointerId);
+    } catch {
+      // ponteiro já solto — ignora.
+    }
+  }
+
+  handleEl.addEventListener("pointerup", stopDragging);
+  handleEl.addEventListener("pointercancel", stopDragging);
 }
 
 function liloRemoveHost() {
@@ -386,6 +442,18 @@ async function liloRunCapture() {
   liloRenderCaptured();
   liloStartWatchingForChanges();
 
+  // Deixa claro que a busca ainda está em andamento — em rede real (não
+  // localhost) pode levar um instante, e sem esse aviso parece que a
+  // extensão simplesmente não achou o funcionário.
+  const loadingHint = liloBodyEl()?.querySelector(".employee-hint");
+  if (loadingHint) {
+    loadingHint.textContent = "Detectando funcionário automaticamente...";
+    loadingHint.style.color = "";
+    loadingHint.style.background = "";
+    loadingHint.style.borderColor = "";
+    loadingHint.classList.remove("hidden");
+  }
+
   const employee = await getOrCreateEmployee(apiUrl, token, data);
   if (myGeneration !== liloCaptureGeneration) return; // usuário já navegou para outra página
   if (employee) {
@@ -401,7 +469,39 @@ async function liloRunCapture() {
       hint.textContent = `Detectado automaticamente: ${employee.name}`;
       hint.classList.remove("hidden");
     }
+  } else {
+    await liloWarnIfAmbiguousName(apiUrl, token, data);
   }
+}
+
+// Sem CPF capturado, um nome duplicado (duas pessoas diferentes com o
+// mesmo nome cadastradas) é ambíguo demais pra selecionar sozinho —
+// arriscaria atribuir o serviço à pessoa errada. Avisa o motivo em vez
+// de só deixar "Selecione..." sem explicação. Também cobre o caso mais
+// comum de simplesmente não achar ninguém (funcionário novo, nome não
+// bate) — a dica de "detectando..." não pode ficar travada.
+async function liloWarnIfAmbiguousName(apiUrl, token, data) {
+  const hint = liloBodyEl()?.querySelector(".employee-hint");
+  const name = String(data.employeeName?.value || "").trim();
+  if (!name) {
+    hint?.classList.add("hidden");
+    return;
+  }
+
+  const matches = await searchEmployees(apiUrl, token, name);
+  const normalizedName = name.toLowerCase();
+  const exactMatches = matches.filter((e) => (e.name || "").trim().toLowerCase() === normalizedName);
+  if (exactMatches.length < 2) {
+    hint?.classList.add("hidden");
+    return;
+  }
+
+  if (!hint) return;
+  hint.textContent = `${exactMatches.length} funcionários cadastrados com o nome "${name}" — não capturei o CPF desta página pra saber qual é. Selecione manualmente.`;
+  hint.style.color = "#d97706";
+  hint.style.background = "#fffbeb";
+  hint.style.borderColor = "rgba(217, 119, 6, 0.2)";
+  hint.classList.remove("hidden");
 }
 
 async function liloSubmitService() {
