@@ -19,15 +19,31 @@ export async function requireSession() {
 
 export async function getAuthUserId(): Promise<string | null> {
   const session = await auth();
-  return session?.user?.id ?? null;
+  if (!session?.user?.id) return null;
+
+  const user = await getUserSecurityInfo(session.user.id);
+  if (!user) return null;
+  if (isIssuedBeforePasswordChange(session.iat, user.passwordChangedAt)) return null;
+
+  return user.id;
 }
 
-async function userExists(userId: string) {
-  const user = await prisma.user.findUnique({
+async function getUserSecurityInfo(userId: string) {
+  return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true },
+    select: { id: true, passwordChangedAt: true },
   });
-  return Boolean(user);
+}
+
+// A token/session issued before the account's password was last changed is
+// stale: it must be rejected so a stolen cookie or bearer token doesn't
+// survive a password reset.
+function isIssuedBeforePasswordChange(
+  issuedAtSeconds: number | undefined,
+  passwordChangedAt: Date,
+): boolean {
+  if (!issuedAtSeconds) return false;
+  return issuedAtSeconds * 1000 < passwordChangedAt.getTime();
 }
 
 export async function requireApiAuth(request: Request) {
@@ -36,23 +52,29 @@ export async function requireApiAuth(request: Request) {
     const token = authHeader.slice(7);
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET);
-      if (payload.sub && (await userExists(payload.sub as string))) {
-        return { userId: payload.sub as string };
-      }
-      return null;
+      if (!payload.sub) return null;
+
+      const user = await getUserSecurityInfo(payload.sub as string);
+      if (!user) return null;
+      if (isIssuedBeforePasswordChange(payload.iat, user.passwordChangedAt)) return null;
+
+      return { userId: user.id };
     } catch {
       return null;
     }
   }
 
   const session = await auth();
-  // Guard against stale JWT sessions pointing to a user that no longer exists
-  // (e.g. after a database reset). This forces a clean re-login instead of a
-  // foreign-key 500 on the first write.
-  if (session?.user?.id && (await userExists(session.user.id))) {
-    return { userId: session.user.id };
-  }
-  return null;
+  if (!session?.user?.id) return null;
+
+  // Guard against stale sessions pointing to a user that no longer exists
+  // (e.g. after a database reset), and against sessions issued before the
+  // account's password was last changed/reset.
+  const user = await getUserSecurityInfo(session.user.id);
+  if (!user) return null;
+  if (isIssuedBeforePasswordChange(session.iat, user.passwordChangedAt)) return null;
+
+  return { userId: user.id };
 }
 
 export async function createExtensionToken(userId: string) {

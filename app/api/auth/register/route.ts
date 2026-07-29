@@ -1,10 +1,14 @@
 import { NextRequest } from "next/server";
 import { apiError, apiSuccess } from "@/lib/api-response";
+import { checkRateLimit } from "@/lib/auth-helpers";
 import { registerSchema } from "@/schemas/auth.schema";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
+  const rateLimited = await checkRateLimit(request, "auth-register", 5, 60 * 60 * 1000);
+  if (rateLimited) return rateLimited;
+
   const body = await request.json();
 
   const parsed = registerSchema.safeParse(body);
