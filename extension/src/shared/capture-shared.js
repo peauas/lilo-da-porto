@@ -91,17 +91,38 @@ function findExactEmployeeMatch(list, name, cpf) {
   );
 }
 
+/**
+ * Content scripts (o painel injetado na página do serviço) executam
+ * fetch() com a origem da própria página visitada para fins de CORS —
+ * não com a permissão da extensão (host_permissions só isenta
+ * contextos privilegiados: popup e background). Isso bloqueia
+ * silenciosamente chamadas para a nossa API a partir do painel. Por
+ * isso essas chamadas passam pelo background, que retransmite o fetch
+ * sem essa restrição. No popup (contexto já privilegiado) isso também
+ * funciona normalmente, só com uma volta a mais de mensagem.
+ */
+function apiFetchViaBackground(url, options) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: "API_FETCH", url, options }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
 async function searchEmployees(apiUrl, token, search) {
   if (!search || !apiUrl || !token) return [];
   try {
-    const res = await fetch(
+    const response = await apiFetchViaBackground(
       `${apiUrl}/api/employees?search=${encodeURIComponent(search)}&status=ACTIVE&limit=20`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
+      { headers: { Authorization: `Bearer ${token}` } },
     );
-    const json = await res.json();
-    return json.success && Array.isArray(json.data) ? json.data : [];
+    return response?.ok && response.body?.success && Array.isArray(response.body.data)
+      ? response.body.data
+      : [];
   } catch {
     return [];
   }
@@ -145,7 +166,7 @@ async function getOrCreateEmployee(apiUrl, token, extracted) {
   if (cpf.length < 11) return null;
 
   try {
-    const res = await fetch(`${apiUrl}/api/employees`, {
+    const response = await apiFetchViaBackground(`${apiUrl}/api/employees`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -158,9 +179,8 @@ async function getOrCreateEmployee(apiUrl, token, extracted) {
         status: "ACTIVE",
       }),
     });
-    const json = await res.json();
-    if (res.ok && json.success) return json.data;
-    if (res.status === 409) {
+    if (response?.ok && response.body?.success) return response.body.data;
+    if (response?.status === 409) {
       const retry = await searchEmployees(apiUrl, token, cpf);
       return findExactEmployeeMatch(retry, name, cpf);
     }

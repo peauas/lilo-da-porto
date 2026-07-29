@@ -35,6 +35,33 @@ function injectAndExtract(tabId, sendResponse) {
   );
 }
 
+// Content scripts (o painel injetado na página do serviço) executam
+// fetch() com a origem da própria página do portal para fins de CORS —
+// não com a permissão da extensão. Isso bloqueia silenciosamente
+// chamadas para a nossa API, que não libera CORS para esse domínio.
+// O background tem host_permissions e não sofre essa restrição, então
+// atua como retransmissor das chamadas de rede do painel.
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type !== "API_FETCH") return;
+
+  (async () => {
+    try {
+      const res = await fetch(message.url, message.options);
+      let body = null;
+      try {
+        body = await res.json();
+      } catch {
+        body = null;
+      }
+      sendResponse({ ok: res.ok, status: res.status, body });
+    } catch (err) {
+      sendResponse({ ok: false, status: 0, error: String(err) });
+    }
+  })();
+
+  return true;
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type !== "GET_TAB_DATA") return;
 
