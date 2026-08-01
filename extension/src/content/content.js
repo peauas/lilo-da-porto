@@ -340,8 +340,12 @@ function extractDate(text) {
     if (d) return { value: d, confidence: 0.6 };
   }
 
+  const now = new Date();
+  const localIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
   return {
-    value: new Date().toISOString().split("T")[0],
+    value: localIso,
     confidence: 0.3,
   };
 }

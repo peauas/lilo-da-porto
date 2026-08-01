@@ -387,18 +387,18 @@ function liloSleep(ms) {
 }
 
 async function liloWaitForExtraction(myGeneration) {
+  let data = null;
   for (let attempt = 0; attempt < LILO_CAPTURE_MAX_ATTEMPTS; attempt++) {
     if (myGeneration !== liloCaptureGeneration) return null;
-    let data;
     try {
       data = extractAll();
     } catch {
       data = null;
     }
-    if (data?.serviceNumber?.value) return data;
+    if (data?.serviceNumber?.value && data?.employeeName?.value) return data;
     await liloSleep(LILO_CAPTURE_RETRY_INTERVAL_MS);
   }
-  return null;
+  return data?.serviceNumber?.value ? data : null;
 }
 
 async function liloRunCapture() {

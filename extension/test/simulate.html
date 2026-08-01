@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Lilo da Porto — Simulação de testes (bugs de data e funcionário)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f1f5f9; color: #0f172a; }
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; padding: 20px; align-items: start; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(15,23,42,.12); padding: 16px 20px; margin-bottom: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 0 0 10px; color: #334155; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 16px; }
+  .mock-page { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 16px; font-size: 14px; }
+  .mock-page .label { color: #64748b; font-size: 12px; margin-top: 10px; }
+  .mock-page .value { font-weight: 600; }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; }
+  button { background: #0284c7; color: #fff; border: none; border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer; margin: 4px 6px 4px 0; }
+  button.secondary { background: #64748b; }
+  button:hover { opacity: .9; }
+  .log { background: #0f172a; color: #d1fae5; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; padding: 10px 12px; border-radius: 8px; max-height: 260px; overflow-y: auto; white-space: pre-wrap; }
+  .panel-sim { width: 320px; border-radius: 12px; box-shadow: 0 6px 24px rgba(15,23,42,.18); font-size: 13px; }
+  .panel-sim .header { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; font-weight: 600; }
+  .panel-sim .body { padding: 14px; }
+  .fields { border: 1px solid #eef1f4; border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+  .fr { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+  .fr:last-child { border-bottom: none; }
+  .fr .k { color: #64748b; }
+  .fr .v { font-weight: 600; }
+  .fr .v.warn { color: #d97706; }
+  .fr .v.ok { color: #16a34a; }
+  .fr .v.bad { color: #dc2626; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; margin-left: 6px; }
+  .pill.old { background: #fee2e2; color: #b91c1c; }
+  .pill.new { background: #dcfce7; color: #166534; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { border: 1px solid #e2e8f0; padding: 4px 8px; text-align: center; }
+  th { background: #f8fafc; }
+  .diff { background: #fef2f2; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div>
+    <div class="card">
+      <h1>Simulação — Lilo da Porto</h1>
+      <div class="sub">
+        Carrega o <code>content.js</code> real (não uma cópia) contra uma página falsa que imita o portal Porto,
+        para validar visualmente os dois bugs reportados sem precisar acessar o site real.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Cenário 1 — Data errada (UTC vs. horário local)</h2>
+      <div class="sub">
+        O bug antigo usava <code>new Date().toISOString()</code> no fallback de data (quando nenhum campo de data
+        é encontrado na página). Isso é sempre UTC — à noite no Brasil (UTC-3), o dia em UTC já virou o dia seguinte.
+        Mova o horário abaixo para ver em que faixa o comportamento antigo divergia do corrigido.
+      </div>
+      <label>Hora local simulada em Brasília (UTC-3): <b id="hourLabel">21:00</b></label><br/>
+      <input type="range" id="hourSlider" min="0" max="23.75" step="0.25" value="21" style="width:100%" />
+      <table id="hourTable" style="margin-top:12px"></table>
+    </div>
+
+    <div class="card">
+      <h2>Cenário 2 — Funcionário (QRA) não identificado nos primeiros serviços</h2>
+      <div class="sub">
+        A página abaixo simula o Salesforce: o número da OS aparece de imediato, mas o bloco "QRA" (nome do
+        funcionário) só é injetado no DOM depois de um atraso — como acontece de verdade quando a seção do
+        colaborador carrega de forma assíncrona. Compare a lógica antiga (só espera <code>serviceNumber</code>)
+        com a corrigida (espera <code>serviceNumber</code> <i>e</i> <code>employeeName</code>).
+      </div>
+
+      <div class="mock-page" id="mockPage">
+        <div class="label">Ordem de Serviço</div>
+        <div class="value">01/4839822-26</div>
+        <div class="label">Data de Atendimento</div>
+        <div class="value">28/07/2026 14:48:11</div>
+        <div class="label">Valor base</div>
+        <div class="value">R$ 181,00</div>
+        <div id="qraSlot"></div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <div style="flex:1">
+          <button class="secondary" id="btnOld">▶ Rodar com lógica ANTIGA</button>
+          <div class="log" id="logOld">aguardando…</div>
+        </div>
+        <div style="flex:1">
+          <button id="btnNew">▶ Rodar com lógica CORRIGIDA</button>
+          <div class="log" id="logNew">aguardando…</div>
+        </div>
+      </div>
+      <div class="sub" style="margin-top:10px">
+        O QRA é injetado no DOM <b>2.4s</b> depois do início da captura (3 ciclos de polling de 800ms), simulando
+        o atraso de hidratação da seção de colaborador no Lightning.
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card panel-sim">
+      <div class="header">🐦 Lilo da Porto — painel simulado</div>
+      <div class="body">
+        <div class="fields" id="panelFields">
+          <div class="fr"><span class="k">Nº Serviço</span><span class="v" id="pfServiceNumber">—</span></div>
+          <div class="fr"><span class="k">Data</span><span class="v" id="pfDate">—</span></div>
+          <div class="fr"><span class="k">Funcionário</span><span class="v" id="pfEmployee">—</span></div>
+        </div>
+        <div class="sub" id="panelHint">Use os cenários ao lado para popular o painel.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- stub mínimo de chrome.* para content.js rodar fora da extensão -->
+<script>
+  window.chrome = { runtime: { onMessage: { addListener: () => {} } } };
+</script>
+<script src="../src/content/content.js"></script>
+<script>
+  // ---------- Cenário 1: UTC vs. local ----------
+  function oldFallback(hourBRT) {
+    // new Date().toISOString() é sempre UTC. Simulamos aritmeticamente:
+    // hora UTC = hora BRT + 3 (BRT = UTC-3)
+    const utcHour = hourBRT + 3;
+    const dayShift = utcHour >= 24 ? 1 : 0;
+    return dayShift; // 1 = "virou o dia seguinte em UTC"
+  }
+  function newFallback(_hourBRT) {
+    // getFullYear/getMonth/getDate usam o fuso local do ambiente que roda o
+    // content script (o navegador do usuário, já em horário de Brasília) —
+    // não há conversão para UTC, então nunca adianta o dia.
+    return 0;
+  }
+
+  function renderHourTable() {
+    const table = document.getElementById("hourTable");
+    let html = "<tr><th>Hora BRT</th><th>Antigo (UTC)</th><th>Corrigido (local)</th></tr>";
+    for (let h = 18; h <= 23; h++) {
+      const old = oldFallback(h);
+      const neu = newFallback(h);
+      const rowClass = old !== neu ? "diff" : "";
+      html += `<tr class="${rowClass}"><td>${h}:00</td><td>${old ? "dia seguinte ⚠️" : "hoje"}</td><td>${neu ? "dia seguinte ⚠️" : "hoje"}</td></tr>`;
+    }
+    table.innerHTML = html;
+  }
+  renderHourTable();
+
+  const hourSlider = document.getElementById("hourSlider");
+  const hourLabel = document.getElementById("hourLabel");
+  function updateHourLabel() {
+    const h = parseFloat(hourSlider.value);
+    const hh = String(Math.floor(h)).padStart(2, "0");
+    const mm = String(Math.round((h % 1) * 60)).padStart(2, "0");
+    hourLabel.textContent = `${hh}:${mm}`;
+    const old = oldFallback(h);
+    const neu = newFallback(h);
+    hourLabel.innerHTML = `${hh}:${mm} ${old !== neu ? '<span class="pill old">antigo mostraria dia seguinte</span><span class="pill new">corrigido mantém hoje</span>' : '<span class="pill">sem divergência nesta hora</span>'}`;
+  }
+  hourSlider.addEventListener("input", updateHourLabel);
+  updateHourLabel();
+
+  // ---------- Cenário 2: espera pelo QRA ----------
+  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  function injectQraLater(delayMs) {
+    setTimeout(() => {
+      const slot = document.getElementById("qraSlot");
+      slot.innerHTML = `
+        <div class="label">QRA</div>
+        <div class="value">119431 - MARCELO GABRIEL FUZETTI</div>`;
+    }, delayMs);
+  }
+
+  function clearQra() {
+    document.getElementById("qraSlot").innerHTML = "";
+  }
+
+  const RETRY_MS = 800;
+  const MAX_ATTEMPTS = 15;
+
+  // lógica ANTIGA: só espera serviceNumber (reproduz o bug relatado)
+  async function waitOld(log) {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const data = extractAll();
+      log(`tentativa ${attempt + 1}: serviceNumber=${data.serviceNumber.value || "—"} employeeName=${data.employeeName.value || "—"}`);
+      if (data.serviceNumber.value) return data;
+      await sleep(RETRY_MS);
+    }
+    return null;
+  }
+
+  // lógica CORRIGIDA: espera serviceNumber E employeeName (com fallback final)
+  async function waitNew(log) {
+    let data = null;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      data = extractAll();
+      log(`tentativa ${attempt + 1}: serviceNumber=${data.serviceNumber.value || "—"} employeeName=${data.employeeName.value || "—"}`);
+      if (data.serviceNumber.value && data.employeeName.value) return data;
+      await sleep(RETRY_MS);
+    }
+    return data?.serviceNumber?.value ? data : null;
+  }
+
+  function renderPanel(data) {
+    document.getElementById("pfServiceNumber").textContent = data.serviceNumber.value || "—";
+    document.getElementById("pfDate").textContent = data.serviceDate.value || "—";
+    const emp = document.getElementById("pfEmployee");
+    emp.textContent = data.employeeName.value || "Selecione...";
+    emp.className = "v " + (data.employeeName.value ? "ok" : "bad");
+  }
+
+  document.getElementById("btnOld").addEventListener("click", async () => {
+    clearQra();
+    const logEl = document.getElementById("logOld");
+    logEl.textContent = "";
+    const log = (m) => (logEl.textContent += m + "\n");
+    injectQraLater(2400);
+    document.getElementById("panelHint").textContent = "Rodando lógica ANTIGA…";
+    const data = await waitOld(log);
+    log(data.employeeName.value ? "✅ funcionário capturado" : "❌ funcionário NÃO capturado — dropdown ficaria em branco");
+    renderPanel(data);
+    document.getElementById("panelHint").textContent = "Resultado da lógica ANTIGA (bug reproduzido).";
+  });
+
+  document.getElementById("btnNew").addEventListener("click", async () => {
+    clearQra();
+    const logEl = document.getElementById("logNew");
+    logEl.textContent = "";
+    const log = (m) => (logEl.textContent += m + "\n");
+    injectQraLater(2400);
+    document.getElementById("panelHint").textContent = "Rodando lógica CORRIGIDA…";
+    const data = await waitNew(log);
+    log(data.employeeName.value ? "✅ funcionário capturado" : "❌ funcionário não apareceu a tempo (fallback acionado)");
+    renderPanel(data);
+    document.getElementById("panelHint").textContent = "Resultado da lógica CORRIGIDA.";
+  });
+</script>
+</body>
+</html>
