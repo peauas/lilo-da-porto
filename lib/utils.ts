@@ -43,6 +43,53 @@ export function monthRangeUTC(year: number, month: number): { start: Date; end: 
   };
 }
 
+/**
+ * Interpreta um valor digitado no formato brasileiro (ponto de milhar,
+ * vírgula decimal) como número. Campos `<input type="number">` tratam o
+ * ponto como separador decimal, então "1.500" virava 1,5 e o desconto
+ * "sumia". Aqui desfazemos essa ambiguidade:
+ *
+ *  - "1500"       -> 1500
+ *  - "1.500"      -> 1500      (ponto seguido de 3 dígitos = milhar)
+ *  - "1.234.567"  -> 1234567   (vários pontos = milhar)
+ *  - "1.500,50"   -> 1500.5    (vírgula presente = separador decimal)
+ *  - "1500,50"    -> 1500.5
+ *  - "1500.50"    -> 1500.5    (ponto com 1-2 casas = decimal, ex. colado)
+ */
+export function parseBRLNumber(input: string | number | null | undefined): number {
+  if (typeof input === "number") return isNaN(input) ? 0 : input;
+  const s = String(input ?? "").trim();
+  if (!s) return 0;
+
+  let cleaned = s.replace(/[^\d.,-]/g, "");
+
+  if (cleaned.includes(",")) {
+    // A vírgula é o separador decimal: pontos só podem ser de milhar.
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  } else {
+    const parts = cleaned.split(".");
+    if (parts.length > 2) {
+      // Vários pontos = separadores de milhar (1.234.567).
+      cleaned = parts.join("");
+    } else if (parts.length === 2 && parts[1].length === 3) {
+      // Um ponto seguido de exatamente 3 dígitos = milhar (1.500).
+      cleaned = parts.join("");
+    }
+    // Demais casos (1500, 1500.50, 1.5) já são um decimal válido.
+  }
+
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+/** Formata um número no padrão brasileiro sem símbolo de moeda (ex.: "1.500,00"). */
+export function formatBRLNumber(value: number, fractionDigits = 2) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
 export function formatCPF(cpf: string) {
   const digits = cpf.replace(/\D/g, "");
   return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
