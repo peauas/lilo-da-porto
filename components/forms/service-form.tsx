@@ -1,10 +1,11 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { serviceSchema, type ServiceInput } from "@/schemas/service.schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -38,6 +39,7 @@ export function ServiceForm({
 }: ServiceFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     setValue,
     watch,
@@ -92,14 +94,33 @@ export function ServiceForm({
       <FormSection title="Valores" description="Valores base e adicionais do serviço.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Valor base" htmlFor="baseValue" required error={errors.baseValue?.message}>
-            <Input id="baseValue" type="number" step="0.01" {...register("baseValue")} />
+            <Controller
+              control={control}
+              name="baseValue"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="baseValue"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
+            />
           </Field>
           <Field label="Valor adicional" htmlFor="additionalValue">
-            <Input
-              id="additionalValue"
-              type="number"
-              step="0.01"
-              {...register("additionalValue")}
+            <Controller
+              control={control}
+              name="additionalValue"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="additionalValue"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </Field>
           <Field label="Observação" htmlFor="notes" className="sm:col-span-2">

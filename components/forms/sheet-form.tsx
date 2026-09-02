@@ -1,10 +1,11 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { sheetUpdateSchema, type SheetUpdateInput } from "@/schemas/sheet.schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSection, Field } from "@/components/forms/form-section";
 import { Loader2, TrendingUp } from "lucide-react";
@@ -27,6 +28,7 @@ export function SheetForm({
 }: SheetFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     watch,
     formState: { errors },
@@ -89,42 +91,83 @@ export function SheetForm({
             />
           </Field>
           <Field label="Ajuda de custo" htmlFor="costAllowance">
-            <Input
-              id="costAllowance"
-              type="number"
-              step="0.01"
-              disabled={readOnly}
-              {...register("costAllowance")}
+            <Controller
+              control={control}
+              name="costAllowance"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="costAllowance"
+                  disabled={readOnly}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </Field>
           <Field label="Vale" htmlFor="voucher">
-            <Input
-              id="voucher"
-              type="number"
-              step="0.01"
-              disabled={readOnly}
-              {...register("voucher")}
+            <Controller
+              control={control}
+              name="voucher"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="voucher"
+                  disabled={readOnly}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </Field>
           <Field label="INSS" htmlFor="inss">
-            <Input id="inss" type="number" step="0.01" disabled={readOnly} {...register("inss")} />
+            <Controller
+              control={control}
+              name="inss"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="inss"
+                  disabled={readOnly}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
+            />
           </Field>
           <Field label="Coparticipação" htmlFor="coparticipation">
-            <Input
-              id="coparticipation"
-              type="number"
-              step="0.01"
-              disabled={readOnly}
-              {...register("coparticipation")}
+            <Controller
+              control={control}
+              name="coparticipation"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="coparticipation"
+                  disabled={readOnly}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </Field>
           <Field label="Outros descontos" htmlFor="otherDiscounts">
-            <Input
-              id="otherDiscounts"
-              type="number"
-              step="0.01"
-              disabled={readOnly}
-              {...register("otherDiscounts")}
+            <Controller
+              control={control}
+              name="otherDiscounts"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="otherDiscounts"
+                  disabled={readOnly}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </Field>
           <Field label="Observações" htmlFor="notes" className="sm:col-span-2">
